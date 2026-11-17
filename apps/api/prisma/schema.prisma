@@ -1,0 +1,492 @@
+// Esquema único para el servidor CENTRAL y los servidores de TIENDA.
+// Tablas maestras (catálogo, usuarios, sucursales) → dueño: central, se replican a tiendas (pull).
+// Tablas transaccionales (ventas, turnos, inventario, auditoría) → dueño: tienda, se suben al central (push).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────── Maestras (central → tienda) ─────────────
+
+model Sucursal {
+  id            String    @id @db.Uuid
+  codigo        String    @unique
+  nombre        String
+  direccion     String?
+  ruc           String?
+  telefono      String?
+  pieTicket     String?
+  configBalanza Json?
+  /// Hash del token de sincronización de la sucursal. Solo existe en el central (no se replica).
+  syncTokenHash String?
+  activa        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  cajas        Caja[]
+  precios      PrecioSucursal[]
+  usuarioRoles UsuarioRol[]
+
+  @@index([updatedAt, id])
+}
+
+model Caja {
+  id         String    @id @db.Uuid
+  sucursalId String    @db.Uuid
+  codigo     String
+  nombre     String
+  /// Serie del correlativo de tickets, única en todo el sistema (ej. S01C01)
+  serie      String    @unique
+  activa     Boolean   @default(true)
+  /// Periféricos de la caja (impresora, balanza, escáner, visor) editados desde la web.
+  /// null = se configuran localmente en la caja.
+  hardware   Json?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  sucursal Sucursal @relation(fields: [sucursalId], references: [id])
+
+  @@unique([sucursalId, codigo])
+  @@index([updatedAt, id])
+}
+
+model Rol {
+  id              String    @id @db.Uuid
+  codigo          String    @unique
+  nombre          String
+  permisos        String[]
+  descuentoMaximo Decimal   @default(0) @db.Decimal(5, 2)
+  retiroMaximo    Decimal   @default(0) @db.Decimal(12, 2)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  usuarios UsuarioRol[]
+
+  @@index([updatedAt, id])
+}
+
+model Usuario {
+  id             String    @id @db.Uuid
+  usuario        String    @unique
+  nombre         String
+  passwordHash   String
+  pinHash        String?
+  /// Código de tarjeta/carnet de supervisor (se escanea para autorizar)
+  codigoTarjeta  String?   @unique
+  foto           String?
+  activo         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  roles UsuarioRol[]
+
+  @@index([updatedAt, id])
+}
+
+model UsuarioRol {
+  id         String    @id @db.Uuid
+  usuarioId  String    @db.Uuid
+  rolId      String    @db.Uuid
+  /// null = el rol aplica en todas las sucursales
+  sucursalId String?   @db.Uuid
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  usuario  Usuario   @relation(fields: [usuarioId], references: [id])
+  rol      Rol       @relation(fields: [rolId], references: [id])
+  sucursal Sucursal? @relation(fields: [sucursalId], references: [id])
+
+  @@index([updatedAt, id])
+  @@index([usuarioId])
+}
+
+model Categoria {
+  id        String    @id @db.Uuid
+  nombre    String
+  color     String?
+  orden     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  productos Producto[]
+
+  @@index([updatedAt, id])
+}
+
+model Producto {
+  id           String    @id @db.Uuid
+  sku          String    @unique
+  nombre       String
+  categoriaId  String?   @db.Uuid
+  /// UND, KG, LT...
+  unidad       String    @default("UND")
+  pesable      Boolean   @default(false)
+  /// Código PLU usado por la balanza etiquetadora
+  plu          String?   @unique
+  precio       Decimal   @db.Decimal(12, 2)
+  costo        Decimal   @default(0) @db.Decimal(12, 4)
+  tasaImpuesto Decimal   @default(18) @db.Decimal(5, 2)
+  /// Código del impuesto configurado (IVA19, EXENTO...). La tasa se guarda igual en tasaImpuesto.
+  impuestoCodigo String?
+  stockMinimo  Decimal   @default(0) @db.Decimal(12, 3)
+  imagen       String?
+  color        String?
+  favorito     Boolean   @default(false)
+  activo       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  categoria Categoria?       @relation(fields: [categoriaId], references: [id])
+  codigos   ProductoCodigo[]
+  precios   PrecioSucursal[]
+
+  @@index([updatedAt, id])
+  @@index([nombre])
+}
+
+model ProductoCodigo {
+  id         String    @id @db.Uuid
+  productoId String    @db.Uuid
+  codigo     String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  producto Producto @relation(fields: [productoId], references: [id])
+
+  @@index([codigo])
+  @@index([updatedAt, id])
+}
+
+model PrecioSucursal {
+  id         String    @id @db.Uuid
+  productoId String    @db.Uuid
+  sucursalId String    @db.Uuid
+  precio     Decimal   @db.Decimal(12, 2)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  producto Producto @relation(fields: [productoId], references: [id])
+  sucursal Sucursal @relation(fields: [sucursalId], references: [id])
+
+  @@unique([productoId, sucursalId])
+  @@index([updatedAt, id])
+}
+
+model Promocion {
+  id             String    @id @db.Uuid
+  nombre         String
+  /// PORCENTAJE | NXM | PRECIO_CANTIDAD
+  tipo           String
+  productoIds    String[]
+  porcentaje     Decimal?  @db.Decimal(5, 2)
+  llevar         Int?
+  pagar          Int?
+  cantidadMinima Decimal?  @db.Decimal(12, 3)
+  precioPromo    Decimal?  @db.Decimal(12, 2)
+  /// null = todas las sucursales
+  sucursalId     String?   @db.Uuid
+  desde          DateTime?
+  hasta          DateTime?
+  activa         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  @@index([updatedAt, id])
+}
+
+// ───────────── Transaccionales (tienda → central) ─────────────
+
+model Cliente {
+  id              String   @id @db.Uuid
+  tipoDocumento   String   @default("DNI")
+  numeroDocumento String
+  nombre          String
+  direccion       String?
+  email           String?
+  telefono        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  ventas Venta[]
+
+  @@index([numeroDocumento])
+}
+
+model TurnoCaja {
+  id                    String    @id @db.Uuid
+  sucursalId            String    @db.Uuid
+  cajaId                String    @db.Uuid
+  usuarioId             String    @db.Uuid
+  /// ABIERTO | CERRADO
+  estado                String    @default("ABIERTO")
+  abiertoEn             DateTime  @default(now())
+  cerradoEn             DateTime?
+  montoInicial          Decimal   @db.Decimal(12, 2)
+  montoCierreDeclarado  Decimal?  @db.Decimal(12, 2)
+  montoCierreEsperado   Decimal?  @db.Decimal(12, 2)
+  diferencia            Decimal?  @db.Decimal(12, 2)
+  /// Detalle del arqueo: conteo de billetes/monedas, totales por método de pago, etc.
+  resumen               Json?
+  cerradoPorId          String?   @db.Uuid
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  ventas      Venta[]
+  movimientos MovimientoCaja[]
+
+  @@index([cajaId, estado])
+  @@index([sucursalId, abiertoEn])
+}
+
+model MovimientoCaja {
+  id              String   @id @db.Uuid
+  turnoId         String   @db.Uuid
+  /// RETIRO | INGRESO
+  tipo            String
+  monto           Decimal  @db.Decimal(12, 2)
+  motivo          String
+  usuarioId       String   @db.Uuid
+  autorizadoPorId String?  @db.Uuid
+  creadoEn        DateTime @default(now())
+
+  turno TurnoCaja @relation(fields: [turnoId], references: [id])
+}
+
+model Venta {
+  id               String    @id @db.Uuid
+  sucursalId       String    @db.Uuid
+  cajaId           String    @db.Uuid
+  turnoId          String    @db.Uuid
+  usuarioId        String    @db.Uuid
+  clienteId        String?   @db.Uuid
+  /// TICKET | BOLETA | FACTURA (preparado para facturación electrónica)
+  tipoComprobante  String    @default("TICKET")
+  serie            String
+  numero           Int
+  numeroCompleto   String
+  fecha            DateTime  @default(now())
+  subtotal         Decimal   @db.Decimal(12, 2)
+  impuesto         Decimal   @db.Decimal(12, 2)
+  descuento        Decimal   @db.Decimal(12, 2)
+  total            Decimal   @db.Decimal(12, 2)
+  pagado           Decimal   @db.Decimal(12, 2)
+  vuelto           Decimal   @db.Decimal(12, 2)
+  /// COMPLETADA | ANULADA
+  estado           String    @default("COMPLETADA")
+  anuladaEn        DateTime?
+  anuladaPorId     String?   @db.Uuid
+  motivoAnulacion  String?
+  /// NO_APLICA | PENDIENTE | ENVIADO | ERROR
+  estadoEnvio      String    @default("NO_APLICA")
+  respuestaEnvio   Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  turno    TurnoCaja      @relation(fields: [turnoId], references: [id])
+  cliente  Cliente?       @relation(fields: [clienteId], references: [id])
+  detalles VentaDetalle[]
+  pagos    VentaPago[]
+
+  @@unique([serie, numero])
+  @@index([sucursalId, fecha])
+  @@index([turnoId])
+}
+
+model VentaDetalle {
+  id                 String  @id @db.Uuid
+  ventaId            String  @db.Uuid
+  productoId         String  @db.Uuid
+  descripcion        String
+  unidad             String
+  cantidad           Decimal @db.Decimal(12, 3)
+  precioUnitario     Decimal @db.Decimal(12, 2)
+  /// Precio de catálogo al momento de la venta (para auditar cambios de precio)
+  precioLista        Decimal @db.Decimal(12, 2)
+  costoUnitario      Decimal @default(0) @db.Decimal(12, 4)
+  descuentoPromocion Decimal @db.Decimal(12, 2)
+  descuentoManual    Decimal @db.Decimal(12, 2)
+  baseImponible      Decimal @db.Decimal(12, 2)
+  impuesto           Decimal @db.Decimal(12, 2)
+  tasaImpuesto       Decimal @db.Decimal(5, 2)
+  total              Decimal @db.Decimal(12, 2)
+  promocionId        String? @db.Uuid
+
+  venta Venta @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+
+  @@index([productoId])
+}
+
+model VentaPago {
+  id         String  @id @db.Uuid
+  ventaId    String  @db.Uuid
+  /// EFECTIVO | TARJETA | TRANSFERENCIA | BILLETERA | OTRO
+  metodo     String
+  monto      Decimal @db.Decimal(12, 2)
+  referencia String?
+
+  venta Venta @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+}
+
+model MovimientoInventario {
+  id            String   @id @db.Uuid
+  sucursalId    String   @db.Uuid
+  productoId    String   @db.Uuid
+  /// VENTA | ANULACION | COMPRA | AJUSTE | MERMA | TRANSFERENCIA_ENTRADA | TRANSFERENCIA_SALIDA
+  tipo          String
+  /// Positivo = entrada, negativo = salida
+  cantidad      Decimal  @db.Decimal(12, 3)
+  costoUnitario Decimal? @db.Decimal(12, 4)
+  referenciaId  String?  @db.Uuid
+  motivo        String?
+  usuarioId     String   @db.Uuid
+  creadoEn      DateTime @default(now())
+
+  @@index([sucursalId, productoId])
+  @@index([referenciaId])
+}
+
+model Auditoria {
+  id              String   @id @db.Uuid
+  sucursalId      String?  @db.Uuid
+  usuarioId       String?  @db.Uuid
+  autorizadoPorId String?  @db.Uuid
+  accion          String
+  entidad         String?
+  entidadId       String?
+  detalle         Json?
+  motivo          String?
+  creadoEn        DateTime @default(now())
+
+  @@index([sucursalId, creadoEn])
+  @@index([accion])
+}
+
+// ───────────── Solo locales (no se sincronizan) ─────────────
+
+/// Correlativo de tickets por caja. Solo lo incrementa el servidor de la tienda dueña de la caja.
+model CajaCorrelativo {
+  cajaId          String    @id @db.Uuid
+  ultimoNumero    Int       @default(0)
+  ultimaActividad DateTime?
+}
+
+/// Autorización puntual de un supervisor (PIN o tarjeta) para una acción que el cajero no puede hacer.
+model Autorizacion {
+  id            String    @id @db.Uuid
+  supervisorId  String    @db.Uuid
+  solicitanteId String    @db.Uuid
+  permiso       String
+  motivo        String?
+  usadaEn       DateTime?
+  expiraEn      DateTime
+  creadoEn      DateTime  @default(now())
+}
+
+/// Venta en curso de cada caja, para recuperarla tras un corte de luz o cierre inesperado.
+model VentaBorrador {
+  cajaId    String   @id @db.Uuid
+  usuarioId String   @db.Uuid
+  data      Json
+  updatedAt DateTime @updatedAt
+}
+
+/// Ventas suspendidas (en espera) para atender a otro cliente.
+model VentaSuspendida {
+  id        String   @id @db.Uuid
+  cajaId    String   @db.Uuid
+  usuarioId String   @db.Uuid
+  etiqueta  String?
+  data      Json
+  creadoEn  DateTime @default(now())
+
+  @@index([cajaId])
+}
+
+model SyncOutbox {
+  id          String    @id @db.Uuid
+  entidad     String
+  entidadId   String    @db.Uuid
+  payload     Json
+  creadoEn    DateTime  @default(now())
+  enviadoEn   DateTime?
+  intentos    Int       @default(0)
+  ultimoError String?
+
+  @@index([enviadoEn, creadoEn])
+}
+
+/// Eventos ya aplicados en el central (idempotencia)
+model SyncRecibido {
+  id         String   @id @db.Uuid
+  sucursalId String   @db.Uuid
+  entidad    String
+  recibidoEn DateTime @default(now())
+}
+
+model SyncEstado {
+  clave         String   @id
+  valor         String
+  actualizadoEn DateTime @updatedAt
+}
+
+/// Último heartbeat de cada sucursal (solo central)
+model SucursalEstado {
+  sucursalId      String   @id @db.Uuid
+  data            Json
+  ultimoHeartbeat DateTime
+}
+
+model Backup {
+  id       String   @id @db.Uuid
+  /// PROGRAMADO | CIERRE_TURNO | MANUAL
+  tipo     String
+  archivo  String?
+  copiaExterna String?
+  tamano   BigInt?
+  ok       Boolean
+  error    String?
+  creadoEn DateTime @default(now())
+}
+
+/// Parámetros del sistema (marca, país, ticket, caja). Una sola fila (PARAMETROS_ID).
+/// Se editan en el central y se replican a las tiendas.
+model Parametros {
+  id        String    @id @db.Uuid
+  datos     Json
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([updatedAt, id])
+}
+
+/// Errores reportados por las cajas y la web (no se sincroniza; se purga a los 30 días)
+model LogCliente {
+  id        String   @id @db.Uuid
+  nivel     String
+  mensaje   String
+  detalle   String?
+  pantalla  String?
+  version   String?
+  cajaId    String?  @db.Uuid
+  usuarioId String?  @db.Uuid
+  equipo    String?
+  creadoEn  DateTime @default(now())
+
+  @@index([creadoEn])
+}

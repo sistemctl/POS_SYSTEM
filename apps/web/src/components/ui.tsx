@@ -1,0 +1,159 @@
+import { ReactNode, useEffect } from 'react';
+import { create } from 'zustand';
+
+type Variante = 'primario' | 'secundario' | 'peligro' | 'alerta' | 'neutro' | 'info';
+
+const estilos: Record<Variante, string> = {
+  primario: 'bg-marca-600 text-white',
+  secundario: 'bg-white text-slate-800 border-2 border-slate-300',
+  peligro: 'bg-red-600 text-white',
+  alerta: 'bg-amber-500 text-white',
+  neutro: 'bg-slate-700 text-white',
+  info: 'bg-sky-600 text-white',
+};
+
+export function Boton({
+  children,
+  variante = 'secundario',
+  className = '',
+  atajo,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variante?: Variante; atajo?: string }) {
+  return (
+    <button type="button" {...props} className={`btn-touch px-4 select-none ${estilos[variante]} ${className}`}>
+      <span className="flex flex-col items-center justify-center leading-tight">
+        {children}
+        {atajo && <span className="text-[11px] font-normal opacity-70">{atajo}</span>}
+      </span>
+    </button>
+  );
+}
+
+export function Modal({
+  titulo,
+  children,
+  onCerrar,
+  ancho = 'max-w-2xl',
+}: {
+  titulo: string;
+  children: ReactNode;
+  onCerrar?: () => void;
+  ancho?: string;
+}) {
+  useEffect(() => {
+    if (!onCerrar) return;
+    const h = (e: KeyboardEvent) => e.key === 'Escape' && onCerrar();
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onCerrar]);
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
+      <div className={`w-full ${ancho} max-h-[95vh] flex flex-col rounded-2xl bg-white shadow-2xl`}>
+        <div className="flex items-center justify-between border-b px-5 py-3">
+          <h2 className="text-xl font-bold">{titulo}</h2>
+          {onCerrar && (
+            <button className="btn-touch text-3xl leading-none text-slate-500" onClick={onCerrar} aria-label="Cerrar">
+              ×
+            </button>
+          )}
+        </div>
+        <div className="scroll-touch flex-1 p-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+/** Teclado numérico táctil grande */
+export function NumPad({
+  valor,
+  onChange,
+  onEnter,
+  decimales = true,
+  maxLen = 12,
+}: {
+  valor: string;
+  onChange: (v: string) => void;
+  onEnter?: () => void;
+  decimales?: boolean;
+  maxLen?: number;
+}) {
+  const tecla = (k: string) => {
+    if (k === '⌫') return onChange(valor.slice(0, -1));
+    if (k === 'C') return onChange('');
+    if (k === '.') {
+      if (!decimales || valor.includes('.')) return;
+      return onChange((valor || '0') + '.');
+    }
+    if (valor.length >= maxLen) return;
+    if (valor.includes('.') && valor.split('.')[1].length >= 3) return;
+    onChange(valor === '0' ? k : valor + k);
+  };
+  const teclas = ['7', '8', '9', '4', '5', '6', '1', '2', '3', decimales ? '.' : 'C', '0', '⌫'];
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {teclas.map((k) => (
+        <button key={k} type="button" onClick={() => tecla(k)} className="btn-touch h-16 bg-slate-100 text-2xl text-slate-800 border border-slate-300">
+          {k}
+        </button>
+      ))}
+      {onEnter && (
+        <button type="button" onClick={onEnter} className="btn-touch col-span-3 h-16 bg-marca-600 text-xl text-white">
+          Aceptar
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ───── Notificaciones ─────
+interface Toast {
+  id: number;
+  texto: string;
+  tipo: 'ok' | 'error' | 'info';
+}
+export const useToasts = create<{ items: Toast[]; push: (t: Omit<Toast, 'id'>) => void }>((set) => ({
+  items: [],
+  push: (t) => {
+    const id = Date.now() + Math.random();
+    set((s) => ({ items: [...s.items, { ...t, id }] }));
+    setTimeout(() => set((s) => ({ items: s.items.filter((x) => x.id !== id) })), t.tipo === 'error' ? 6000 : 3000);
+  },
+}));
+export const toast = {
+  ok: (texto: string) => useToasts.getState().push({ texto, tipo: 'ok' }),
+  error: (texto: string) => {
+    useToasts.getState().push({ texto, tipo: 'error' });
+    // Todo error que ve el cajero queda registrado en el servidor para poder diagnosticarlo
+    import('../lib/logs').then((m) => m.reportarError(texto, undefined, 'warn')).catch(() => undefined);
+  },
+  info: (texto: string) => useToasts.getState().push({ texto, tipo: 'info' }),
+};
+
+export function Toasts() {
+  const items = useToasts((s) => s.items);
+  return (
+    <div className="pointer-events-none fixed right-4 top-4 z-[60] flex w-96 flex-col gap-2">
+      {items.map((t) => (
+        <div
+          key={t.id}
+          className={`rounded-xl px-4 py-3 text-lg font-semibold text-white shadow-lg ${
+            t.tipo === 'ok' ? 'bg-marca-600' : t.tipo === 'error' ? 'bg-red-600' : 'bg-slate-700'
+          }`}
+        >
+          {t.texto}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function Campo({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-sm font-semibold text-slate-600">{etiqueta}</span>
+      {children}
+    </label>
+  );
+}
+
+export const inputCls = 'h-12 rounded-lg border-2 border-slate-300 px-3 text-lg focus:border-marca-500 focus:outline-none';

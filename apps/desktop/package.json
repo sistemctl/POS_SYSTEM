@@ -1,0 +1,48 @@
+{
+  "name": "@pos/desktop",
+  "version": "0.2.6",
+  "private": true,
+  "description": "POS Supermercado - Caja",
+  "author": "POS Supermercado",
+  "main": "dist/main.js",
+  "scripts": {
+    "compile": "node build.mjs",
+    "dev": "node build.mjs && cross-env POS_DEV_URL=http://localhost:5173 electron .",
+    "start": "node build.mjs && electron .",
+    "build": "node build.mjs",
+    "dist": "pnpm --filter @pos/web build && node build.mjs && electron-builder --win nsis",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9",
+    "iconv-lite": "^0.6.3",
+    "serialport": "^12.0.0"
+  },
+  "devDependencies": {
+    "@pos/hardware": "workspace:*",
+    "@pos/shared": "workspace:*",
+    "@types/node": "^22.10.2",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.2"
+  },
+  "build": {
+    "appId": "com.possupermercado.caja",
+    "productName": "POS Supermercado",
+    "electronVersion": "33.4.11",
+    "directories": { "output": "release" },
+    "files": ["dist/**/*", "package.json"],
+    "extraResources": [{ "from": "../web/dist", "to": "web" }],
+    "win": { "target": ["nsis"], "signAndEditExecutable": false, "artifactName": "POS-Supermercado-Setup-${version}.${ext}" },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "POS Supermercado"
+    },
+    "publish": [{ "provider": "generic", "url": "http://localhost:3001/updates/" }]
+  }
+}

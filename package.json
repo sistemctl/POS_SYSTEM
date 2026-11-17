@@ -1,0 +1,35 @@
+{
+  "name": "pos-supermercado",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "dev:central": "pnpm --filter @pos/api dev:central",
+    "dev:store": "pnpm --filter @pos/api dev:store",
+    "dev:web": "pnpm --filter @pos/web dev",
+    "dev:desktop": "pnpm --filter @pos/desktop dev",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "db:migrate": "pnpm --filter @pos/api db:migrate",
+    "db:seed": "pnpm --filter @pos/api db:seed"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "bcrypt",
+      "electron",
+      "esbuild",
+      "serialport",
+      "@serialport/bindings-cpp",
+      "usb"
+    ]
+  }
+}

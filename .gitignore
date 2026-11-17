@@ -1,0 +1,13 @@
+node_modules/
+dist/
+release/
+.turbo/
+*.log
+.env
+.env.*
+!.env.example
+backups/
+certificados/
+*.pfx
+*.pem
+*.key
