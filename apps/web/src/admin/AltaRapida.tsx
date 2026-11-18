@@ -62,6 +62,7 @@ export default function AltaRapida() {
     categoriaId: (ultimo.categoriaId as string) ?? '',
     impuestoCodigo: (ultimo.impuestoCodigo as string) ?? p.regional.impuestoPorDefecto,
     pesable: false,
+    unidadPeso: 'KG' as 'KG' | 'LB',
     favorito: false,
   });
   const [guardando, setGuardando] = useState(false);
@@ -152,7 +153,7 @@ export default function AltaRapida() {
           sku: nuevo,
           nombre: form.nombre.trim(),
           categoriaId: form.categoriaId || null,
-          unidad: form.pesable ? 'KG' : 'UND',
+          unidad: form.pesable ? form.unidadPeso : 'UND',
           pesable: form.pesable,
           precio,
           tasaImpuesto: String(imp.tasa),
@@ -250,7 +251,7 @@ export default function AltaRapida() {
             <Campo etiqueta="Nombre">
               <input ref={refNombre} className={inputCls} value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} onKeyDown={(e) => enter(e, () => refPrecio.current?.focus())} />
             </Campo>
-            <Campo etiqueta={`Precio de venta con ${p.regional.nombreImpuesto}${form.pesable ? ' (por kg)' : ''}`}>
+            <Campo etiqueta={`Precio de venta con ${p.regional.nombreImpuesto}${form.pesable ? (form.unidadPeso === 'LB' ? ' (por libra)' : ' (por kilo)') : ''}`}>
               <input
                 ref={refPrecio}
                 className={`${inputCls} text-2xl font-bold`}
@@ -284,6 +285,20 @@ export default function AltaRapida() {
                 <input type="checkbox" className="h-7 w-7" checked={form.pesable} onChange={(e) => setForm({ ...form, pesable: e.target.checked })} />
                 Se vende por peso
               </label>
+            )}
+            {nuevo && form.pesable && (
+              <div className="grid grid-cols-2 gap-2">
+                {(['KG', 'LB'] as const).map((u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => setForm({ ...form, unidadPeso: u })}
+                    className={`btn-touch h-14 text-lg border ${form.unidadPeso === u ? 'bg-marca-600 text-white border-marca-600' : 'bg-white text-slate-800 border-slate-300'}`}
+                  >
+                    Precio por {u === 'KG' ? 'kilo' : 'libra'}
+                  </button>
+                ))}
+              </div>
             )}
             <label className="flex items-center gap-3 text-lg">
               <input type="checkbox" className="h-7 w-7" checked={form.favorito} onChange={(e) => setForm({ ...form, favorito: e.target.checked })} />

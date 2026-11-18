@@ -42,6 +42,11 @@ export async function sincronizarHardware(): Promise<void> {
 export function iniciarHardwareRemoto() {
   if (timer !== null || !bridge() || !leerConfig().cajaId) return;
   const tick = () => sincronizarHardware().catch(() => undefined);
-  tick();
+  // Primera descarga: si el servidor aún está arrancando, reintentar cada 10 s hasta lograrla
+  const primera = () =>
+    sincronizarHardware().catch(() => {
+      if (timer !== null) window.setTimeout(primera, 10_000);
+    });
+  primera();
   timer = window.setInterval(tick, INTERVALO_MS);
 }

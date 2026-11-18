@@ -104,7 +104,7 @@ export default function Productos() {
       plu: f.plu || null,
       color: f.color || null,
       codigos: f.codigos.split(/[\n,]/).map((c) => c.trim()).filter(Boolean),
-      unidad: f.pesable ? 'KG' : f.unidad,
+      unidad: f.pesable ? (f.unidad === 'LB' ? 'LB' : 'KG') : f.unidad === 'LB' ? 'UND' : f.unidad,
     };
     try {
       const r = editando.id ? await put(`/catalogo/productos/${editando.id}`, body) : await post('/catalogo/productos', body);
@@ -276,9 +276,9 @@ export default function Productos() {
             <Campo etiqueta="Stock mínimo">
               <input className={inputCls} type="number" value={f.stockMinimo} onChange={(e) => set('stockMinimo', e.target.value)} />
             </Campo>
-            <Campo etiqueta="Unidad">
-              <select className={inputCls} value={f.pesable ? 'KG' : f.unidad} disabled={f.pesable} onChange={(e) => set('unidad', e.target.value)}>
-                {['UND', 'KG', 'LT', 'PAQ', 'CJA'].map((u) => (
+            <Campo etiqueta={f.pesable ? 'Precio por (KG o LB)' : 'Unidad'}>
+              <select className={inputCls} value={f.pesable ? (f.unidad === 'LB' ? 'LB' : 'KG') : f.unidad} onChange={(e) => set('unidad', e.target.value)}>
+                {(f.pesable ? ['KG', 'LB'] : ['UND', 'KG', 'LT', 'PAQ', 'CJA']).map((u) => (
                   <option key={u}>{u}</option>
                 ))}
               </select>

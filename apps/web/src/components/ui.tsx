@@ -63,7 +63,7 @@ export function Modal({
             </button>
           )}
         </div>
-        <div className={`flex-1 p-5 ${alto ? 'flex min-h-0 flex-col' : 'scroll-touch'}`}>{children}</div>
+        <div className={`flex-1 p-4 ${alto ? 'flex min-h-0 flex-col' : 'scroll-touch'}`}>{children}</div>
       </div>
     </div>
   );
@@ -109,12 +109,14 @@ export function NumPad({
   onEnter,
   decimales = true,
   maxLen = 12,
+  textoEnter = 'Aceptar',
 }: {
   valor: string;
   onChange: (v: string) => void;
   onEnter?: () => void;
   decimales?: boolean;
   maxLen?: number;
+  textoEnter?: React.ReactNode;
 }) {
   const tecla = (k: string) => {
     if (k === '⌫') return onChange(valor.slice(0, -1));
@@ -131,13 +133,13 @@ export function NumPad({
   return (
     <div className="grid grid-cols-3 gap-2">
       {teclas.map((k) => (
-        <button key={k} type="button" onClick={() => tecla(k)} className="btn-touch h-16 bg-slate-100 text-2xl text-slate-800 border border-slate-300">
+        <button key={k} type="button" onClick={() => tecla(k)} className="btn-touch h-[clamp(2.75rem,7.5vh,4rem)] bg-slate-100 text-2xl text-slate-800 border border-slate-300">
           {k}
         </button>
       ))}
       {onEnter && (
-        <button type="button" onClick={onEnter} className="btn-touch col-span-3 h-16 bg-marca-600 text-xl text-white">
-          Aceptar
+        <button type="button" onClick={onEnter} className="btn-touch col-span-3 h-[clamp(2.75rem,7.5vh,4rem)] bg-marca-600 text-xl text-white">
+          {textoEnter}
         </button>
       )}
     </div>

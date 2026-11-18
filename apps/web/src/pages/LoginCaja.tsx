@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { LoginResponse, UsuarioCaja } from '@pos/shared';
-import { get, post } from '../lib/api';
+import { ApiError, get, post } from '../lib/api';
 import { leerConfig } from '../lib/config';
 import { useSesion } from '../store/sesion';
 import { Boton, NumPad } from '../components/ui';
@@ -27,18 +27,38 @@ export default function LoginCaja() {
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(mensaje);
   const [cargando, setCargando] = useState(false);
-
-  const cargar = () =>
-    get<UsuarioCaja[]>('/auth/usuarios-caja')
-      .then((u) => {
-        setUsuarios(u);
-        setError(null);
-      })
-      .catch((e) => setError(e.message));
+  /** Error al traer la lista de usuarios (p. ej. el servidor todavía está arrancando); se reintenta solo */
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!cfg.cajaId) nav('/config');
+    if (!cfg.cajaId) {
+      nav('/config');
+      return;
+    }
+    // Reintenta cada 3 s mientras el servidor no responda (arranque de Windows, corte de red);
+    // ya conectado, refresca la lista cada minuto.
+    let vivo = true;
+    let t: number | undefined;
+    const cargar = async () => {
+      try {
+        const u = await get<UsuarioCaja[]>('/auth/usuarios-caja');
+        if (!vivo) return;
+        setUsuarios(u);
+        setErrorCarga(null);
+        t = window.setTimeout(cargar, 60_000);
+      } catch (e: any) {
+        if (!vivo) return;
+        setErrorCarga(
+          e instanceof ApiError && e.sinConexion ? 'Conectando con el servidor de la tienda… (reintentando)' : e.message,
+        );
+        t = window.setTimeout(cargar, 3_000);
+      }
+    };
     cargar();
+    return () => {
+      vivo = false;
+      window.clearTimeout(t);
+    };
   }, []);
 
   const entrar = async () => {
@@ -105,7 +125,10 @@ export default function LoginCaja() {
               </button>
             ))}
           </div>
-          {!usuarios.length && !error && <div className="text-slate-500">Cargando usuarios…</div>}
+          {errorCarga && (
+            <div className="mb-4 rounded-xl bg-amber-100 p-4 text-lg font-semibold text-amber-800">{errorCarga}</div>
+          )}
+          {!usuarios.length && !errorCarga && <div className="text-slate-500">Cargando usuarios…</div>}
         </div>
 
         <div className="w-[360px] shrink-0 rounded-2xl bg-white p-5 shadow">

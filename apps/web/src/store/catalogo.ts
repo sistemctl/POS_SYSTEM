@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import {
   CONFIG_BALANZA_DEFECTO,
+  convertirPeso,
+  unidadVentaPeso,
   parseEtiquetaBalanza,
   type CatalogoCaja,
   type CategoriaCaja,
@@ -152,7 +154,7 @@ export const useCatalogo = create<CatalogoState>((set, getState) => ({
       const p = s.porPlu.get(etiqueta.codigoProducto);
       if (p) {
         const cantidad =
-          etiqueta.tipoValor === 'PESO' ? etiqueta.valor : Math.round((etiqueta.valor / Number(p.precio)) * 1000) / 1000;
+          etiqueta.tipoValor === 'PESO' ? convertirPeso(etiqueta.valor, 'KG', unidadVentaPeso(p.unidad)) : Math.round((etiqueta.valor / Number(p.precio)) * 1000) / 1000;
         return { producto: p, cantidad };
       }
     }

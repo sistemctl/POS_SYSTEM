@@ -9,6 +9,9 @@ import { AppConfig } from '../config/app-config';
 import { PrismaService, Tx } from '../prisma/prisma.service';
 import { OutboxService } from '../sync/outbox.service';
 
+/** Mensaje que la caja reconoce para pedir la observación (arqueo ciego: no revela el monto esperado). */
+export const OBSERVACION_REQUERIDA = 'El conteo no cuadra: escriba una observación para cerrar el turno';
+
 @Injectable()
 export class TurnosService {
   constructor(
@@ -78,8 +81,24 @@ export class TurnosService {
     const efectivoVentas = (porMetodo['EFECTIVO'] ?? new Decimal(0)).minus(vueltos);
     const efectivoEsperado = new Decimal(turno.montoInicial.toString()).plus(efectivoVentas).plus(ingresos).minus(retiros);
 
+    // Nombres legibles para el reporte de cierre y la vista de administración
+    const idsUsuarios = [turno.usuarioId, turno.cerradoPorId, ...movimientos.flatMap((m) => [m.usuarioId, m.autorizadoPorId])].filter(
+      (x): x is string => !!x,
+    );
+    const [usuarios, caja] = await Promise.all([
+      db.usuario.findMany({ where: { id: { in: [...new Set(idsUsuarios)] } }, select: { id: true, nombre: true } }),
+      db.caja.findUnique({ where: { id: turno.cajaId }, select: { nombre: true, codigo: true } }),
+    ]);
+    const nombre = (id: string | null) => (id ? (usuarios.find((u) => u.id === id)?.nombre ?? null) : null);
+    const guardado = (turno.resumen ?? {}) as { conteo?: Record<string, number>; observacion?: string | null };
+
     return {
       turno,
+      cajero: nombre(turno.usuarioId),
+      cerradoPor: nombre(turno.cerradoPorId),
+      caja: caja ? `${caja.nombre} (${caja.codigo})` : null,
+      conteo: guardado.conteo ?? null,
+      observacion: guardado.observacion ?? null,
       cantidadVentas: ventas.length - anuladas,
       totalVentas: totalVentas.toFixed(2),
       totalDescuentos: totalDescuentos.toFixed(2),
@@ -92,7 +111,7 @@ export class TurnosService {
       retiros: retiros.toFixed(2),
       ingresos: ingresos.toFixed(2),
       efectivoEsperado: efectivoEsperado.toFixed(2),
-      movimientos,
+      movimientos: movimientos.map((m) => ({ ...m, usuario: nombre(m.usuarioId), autorizadoPor: nombre(m.autorizadoPorId) })),
     };
   }
 
@@ -104,8 +123,27 @@ export class TurnosService {
       if (turno.usuarioId !== user.sub && !user.permisos.includes(PERMISOS.TURNO_VER_TODOS)) {
         throw new ForbiddenException('Solo el cajero del turno o un supervisor puede cerrarlo');
       }
+      const enEspera = await tx.ventaSuspendida.count({ where: { cajaId: turno.cajaId } });
+      if (enEspera > 0) {
+        throw new BadRequestException(
+          `Hay ${enEspera} ${enEspera === 1 ? 'venta' : 'ventas'} en espera. Recupérelas antes de cerrar el turno`,
+        );
+      }
+      // Si se contó por denominaciones, el monto declarado debe ser la suma del conteo
+      const entradas = Object.entries(conteo).filter(([, n]) => n > 0);
+      if (entradas.length) {
+        const suma = entradas.reduce((s, [d, n]) => s.plus(new Decimal(d).mul(n)), new Decimal(0));
+        if (!suma.equals(new Decimal(montoDeclarado))) {
+          throw new BadRequestException('El monto declarado no coincide con el conteo de billetes y monedas');
+        }
+      }
       const res = await this.resumen(turnoId, tx);
       const diferencia = new Decimal(montoDeclarado).minus(res.efectivoEsperado);
+      const obs = observacion?.trim() || undefined;
+      if (!diferencia.isZero() && (!obs || obs.length < 3)) {
+        throw new BadRequestException(OBSERVACION_REQUERIDA);
+      }
+      observacion = obs;
       const cerrado = await tx.turnoCaja.update({
         where: { id: turnoId },
         data: {
@@ -130,6 +168,17 @@ export class TurnosService {
         },
       });
       await this.outbox.encolar(tx, 'turno_caja', cerrado.id, cerrado);
+      await this.auditoria.registrar(
+        {
+          sucursalId: turno.sucursalId,
+          usuarioId: user.sub,
+          accion: 'turno.cerrar',
+          entidad: 'turno_caja',
+          entidadId: turnoId,
+          detalle: { totalVentas: res.totalVentas, declarado: montoDeclarado, diferencia: diferencia.toFixed(2) },
+        },
+        tx,
+      );
       if (!diferencia.isZero()) {
         await this.auditoria.registrar(
           {
@@ -144,7 +193,16 @@ export class TurnosService {
           tx,
         );
       }
-      return { ...res, turno: cerrado, diferencia: diferencia.toFixed(2), montoDeclarado };
+      const cerradoPor = await tx.usuario.findUnique({ where: { id: user.sub }, select: { nombre: true } });
+      return {
+        ...res,
+        turno: cerrado,
+        cerradoPor: cerradoPor?.nombre ?? null,
+        conteo,
+        observacion: observacion ?? null,
+        diferencia: diferencia.toFixed(2),
+        montoDeclarado,
+      };
     });
     // Backup automático tras cada cierre de turno (no bloquea la respuesta)
     this.backup.ejecutar('CIERRE_TURNO').catch(() => undefined);
@@ -195,8 +253,8 @@ export class TurnosService {
     });
   }
 
-  listar(f: { sucursalId?: string | null; usuarioId?: string; cajaId?: string; desde?: Date; hasta?: Date }) {
-    return this.prisma.turnoCaja.findMany({
+  async listar(f: { sucursalId?: string | null; usuarioId?: string; cajaId?: string; desde?: Date; hasta?: Date }) {
+    const turnos = await this.prisma.turnoCaja.findMany({
       where: {
         sucursalId: f.sucursalId ?? undefined,
         usuarioId: f.usuarioId,
@@ -206,5 +264,12 @@ export class TurnosService {
       orderBy: { abiertoEn: 'desc' },
       take: 200,
     });
+    const [usuarios, cajas] = await Promise.all([
+      this.prisma.usuario.findMany({ where: { id: { in: [...new Set(turnos.map((t) => t.usuarioId))] } }, select: { id: true, nombre: true } }),
+      this.prisma.caja.findMany({ where: { id: { in: [...new Set(turnos.map((t) => t.cajaId))] } }, select: { id: true, nombre: true } }),
+    ]);
+    const u = new Map(usuarios.map((x) => [x.id, x.nombre]));
+    const c = new Map(cajas.map((x) => [x.id, x.nombre]));
+    return turnos.map((t) => ({ ...t, cajero: u.get(t.usuarioId) ?? null, caja: c.get(t.cajaId) ?? null }));
   }
 }

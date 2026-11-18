@@ -41,13 +41,16 @@ textarea {
   user-select: text;
 }
 
-/* Botón táctil base: mínimo 56px, respuesta visual al presionar */
-.btn-touch {
-  min-height: var(--boton-alto);
-  min-width: 56px;
-  border-radius: 0.875rem;
-  font-weight: 600;
-  transition: transform 0.06s ease, filter 0.06s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+/* Botón táctil base: mínimo 56px, respuesta visual al presionar.
+   En la capa «components» para que las clases de Tailwind (min-h-0, rounded-full, h-11…) puedan ajustarlo. */
+@layer components {
+  .btn-touch {
+    min-height: var(--boton-alto);
+    min-width: 56px;
+    border-radius: 0.875rem;
+    font-weight: 600;
+    transition: transform 0.06s ease, filter 0.06s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  }
 }
 
 /* Línea recién agregada al ticket */
@@ -80,6 +83,6 @@ textarea {
 
 /* Teclado virtual más grande */
 .simple-keyboard.hg-theme-default .hg-button {
-  height: 56px;
+  height: clamp(40px, 6.5vh, 56px);
   font-size: 1.25rem;
 }

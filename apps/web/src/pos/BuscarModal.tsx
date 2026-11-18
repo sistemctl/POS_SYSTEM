@@ -43,7 +43,7 @@ export function BuscarModal({
             <span className="text-lg">{p.nombre}</span>
             <span className="text-sm font-normal text-slate-500">
               {dinero(p.precio)}
-              {p.pesable ? ' / kg' : ''} · {p.sku}
+              {p.pesable ? ` / ${p.unidad.toLowerCase()}` : ''} · {p.sku}
             </span>
           </button>
         ))}

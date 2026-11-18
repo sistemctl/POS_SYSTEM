@@ -167,6 +167,27 @@ export async function imprimirTicket(t: TicketData, moneda: string) {
   setTimeout(() => iframe.remove(), 2000);
 }
 
+/** Imprime texto plano (reportes). Con la app de escritorio va directo a la ticketera; en navegador, diálogo de impresión. */
+export async function imprimirTexto(texto: string) {
+  const b = bridge();
+  if (b) return b.printer.printText(texto);
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  document.body.appendChild(iframe);
+  const doc = iframe.contentWindow!.document;
+  doc.open();
+  doc.write(
+    `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0}pre{font-family:monospace;font-size:12px;margin:2mm;white-space:pre}</style></head><body><pre>${esc(texto)}</pre></body></html>`,
+  );
+  doc.close();
+  await new Promise((r) => setTimeout(r, 200));
+  iframe.contentWindow!.print();
+  setTimeout(() => iframe.remove(), 2000);
+}
+
 export async function abrirCajon() {
   await bridge()?.drawer.open();
 }

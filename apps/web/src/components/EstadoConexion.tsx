@@ -14,22 +14,26 @@ export function EstadoConexion() {
 
   useEffect(() => {
     let vivo = true;
+    let t: number | undefined;
     const revisar = async () => {
+      let hayServidor = true;
       try {
         const s = await get<EstadoSincronizacion>('/sync/estado');
         if (!vivo) return;
-        setServidor(true);
         setSync(s);
       } catch (e) {
         // Solo es "sin servidor" si no hubo respuesta; un 401/403 significa que el servidor sí responde
-        if (vivo) setServidor(!(e instanceof ApiError && e.sinConexion));
+        hayServidor = !(e instanceof ApiError && e.sinConexion);
       }
+      if (!vivo) return;
+      setServidor(hayServidor);
+      // Sin servidor se reintenta seguido para reconectar apenas vuelva
+      t = window.setTimeout(revisar, hayServidor ? 15_000 : 3_000);
     };
     revisar();
-    const t = setInterval(revisar, 15_000);
     return () => {
       vivo = false;
-      clearInterval(t);
+      window.clearTimeout(t);
     };
   }, []);
 

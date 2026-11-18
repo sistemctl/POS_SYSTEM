@@ -6,6 +6,8 @@ import { usePermiso } from '../store/sesion';
 import { useNavigate } from 'react-router-dom';
 import { Boton, Campo, inputCls, Modal, NumPad, toast } from '../components/ui';
 import { useModoServidor } from './AdminLayout';
+import { imprimirReporteCierre, type ResumenTurno } from '../lib/reporteCierre';
+import { nombreMetodo } from '../pos/metodos';
 
 function SelectorProductos({ valor, onChange }: { valor: string[]; onChange: (v: string[]) => void }) {
   const [buscar, setBuscar] = useState('');
@@ -460,60 +462,205 @@ export function Inventario() {
 }
 
 // ───────────────────────── Turnos ─────────────────────────
+const isoDia = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const fechaHora = (v?: string | null) => (v ? new Date(v).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) : '—');
+
 export function Turnos() {
   const [turnos, setTurnos] = useState<any[]>([]);
-  const [usuarios, setUsuarios] = useState<Record<string, string>>({});
-  const [detalle, setDetalle] = useState<any | null>(null);
+  const [usuarios, setUsuarios] = useState<{ id: string; nombre: string }[]>([]);
+  const [detalle, setDetalle] = useState<ResumenTurno | null>(null);
+  const [filtro, setFiltro] = useState(() => ({ desde: isoDia(new Date(Date.now() - 7 * 86400000)), hasta: isoDia(new Date()), usuarioId: '' }));
+
+  const cargar = () => {
+    const q = new URLSearchParams();
+    if (filtro.desde) q.set('desde', new Date(`${filtro.desde}T00:00:00`).toISOString());
+    if (filtro.hasta) q.set('hasta', new Date(`${filtro.hasta}T23:59:59.999`).toISOString());
+    if (filtro.usuarioId) q.set('usuarioId', filtro.usuarioId);
+    get<any[]>(`/turnos?${q}`).then(setTurnos).catch((e) => toast.error(e.message));
+  };
   useEffect(() => {
-    get('/turnos').then(setTurnos).catch((e) => toast.error(e.message));
-    get('/usuarios').then((u: any[]) => setUsuarios(Object.fromEntries(u.map((x) => [x.id, x.nombre])))).catch(() => undefined);
+    get<any[]>('/usuarios')
+      .then((u) => setUsuarios(u.map((x) => ({ id: x.id, nombre: x.nombre }))))
+      .catch(() => undefined);
   }, []);
+  useEffect(cargar, [filtro]);
+
+  const conDiferencia = turnos.filter((t) => t.diferencia !== null && Number(t.diferencia) !== 0);
+  const sumaDiferencias = conDiferencia.reduce((s, t) => s + Number(t.diferencia), 0);
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">Turnos y arqueos</h1>
+      <div className="flex flex-wrap items-end gap-3 rounded-xl bg-white p-3 shadow">
+        <Campo etiqueta="Desde">
+          <input className={inputCls} type="date" value={filtro.desde} onChange={(e) => setFiltro({ ...filtro, desde: e.target.value })} />
+        </Campo>
+        <Campo etiqueta="Hasta">
+          <input className={inputCls} type="date" value={filtro.hasta} onChange={(e) => setFiltro({ ...filtro, hasta: e.target.value })} />
+        </Campo>
+        <Campo etiqueta="Cajero">
+          <select className={inputCls} value={filtro.usuarioId} onChange={(e) => setFiltro({ ...filtro, usuarioId: e.target.value })}>
+            <option value="">Todos</option>
+            {usuarios.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.nombre}
+              </option>
+            ))}
+          </select>
+        </Campo>
+        <div className="ml-auto text-sm text-slate-600">
+          {turnos.length} turnos · {conDiferencia.length} con diferencia
+          {conDiferencia.length > 0 && (
+            <>
+              {' '}
+              · neto <b className={sumaDiferencias < 0 ? 'text-red-600' : 'text-amber-600'}>{dinero(sumaDiferencias)}</b>
+            </>
+          )}
+        </div>
+      </div>
       <table className="w-full rounded-xl bg-white text-left shadow">
         <thead className="bg-slate-100 text-sm text-slate-600">
           <tr>
             <th className="p-3">Apertura</th>
+            <th>Cierre</th>
+            <th>Caja</th>
             <th>Cajero</th>
             <th>Estado</th>
             <th className="text-right">Esperado</th>
             <th className="text-right">Contado</th>
-            <th className="text-right">Diferencia</th>
+            <th className="pr-3 text-right">Diferencia</th>
           </tr>
         </thead>
         <tbody>
-          {turnos.map((t) => (
-            <tr key={t.id} className="cursor-pointer border-t hover:bg-slate-50" onClick={() => get(`/turnos/${t.id}/resumen`).then(setDetalle)}>
-              <td className="p-3">{new Date(t.abiertoEn).toLocaleString('es')}</td>
-              <td>{usuarios[t.usuarioId] ?? '…'}</td>
-              <td>{t.estado}</td>
-              <td className="text-right">{t.montoCierreEsperado ? dinero(t.montoCierreEsperado) : '—'}</td>
-              <td className="text-right">{t.montoCierreDeclarado ? dinero(t.montoCierreDeclarado) : '—'}</td>
-              <td className={`text-right font-bold ${Number(t.diferencia ?? 0) < 0 ? 'text-red-600' : Number(t.diferencia ?? 0) > 0 ? 'text-amber-600' : ''}`}>
-                {t.diferencia !== null && t.diferencia !== undefined ? dinero(t.diferencia) : '—'}
-              </td>
-            </tr>
-          ))}
+          {turnos.map((t) => {
+            const dif = t.diferencia !== null && t.diferencia !== undefined ? Number(t.diferencia) : null;
+            return (
+              <tr
+                key={t.id}
+                className={`cursor-pointer border-t hover:bg-slate-50 ${dif ? (dif < 0 ? 'bg-red-50/60' : 'bg-amber-50/60') : ''}`}
+                onClick={() =>
+                  get<ResumenTurno>(`/turnos/${t.id}/resumen`)
+                    .then(setDetalle)
+                    .catch((e) => toast.error(e.message))
+                }
+              >
+                <td className="p-3">{fechaHora(t.abiertoEn)}</td>
+                <td>{fechaHora(t.cerradoEn)}</td>
+                <td>{t.caja ?? '—'}</td>
+                <td>{t.cajero ?? '—'}</td>
+                <td>
+                  <span className={`rounded-full px-2 py-0.5 text-sm font-semibold ${t.estado === 'ABIERTO' ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-700'}`}>
+                    {t.estado === 'ABIERTO' ? 'Abierto' : 'Cerrado'}
+                  </span>
+                </td>
+                <td className="text-right">{t.montoCierreEsperado ? dinero(t.montoCierreEsperado) : '—'}</td>
+                <td className="text-right">{t.montoCierreDeclarado ? dinero(t.montoCierreDeclarado) : '—'}</td>
+                <td className={`pr-3 text-right font-bold ${dif === null ? '' : dif < 0 ? 'text-red-600' : dif > 0 ? 'text-amber-600' : 'text-marca-700'}`}>
+                  {dif === null ? '—' : dif === 0 ? 'Cuadrada' : `${dif > 0 ? '+' : ''}${dinero(dif)}`}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
-      {detalle && (
-        <Modal titulo="Resumen del turno" onCerrar={() => setDetalle(null)}>
-          <div className="space-y-1 text-lg">
-            <div>Ventas: {detalle.cantidadVentas} · {dinero(detalle.totalVentas)}</div>
-            <div>Anuladas: {detalle.anuladas} · {dinero(detalle.totalAnulado)}</div>
-            <div>Descuentos: {dinero(detalle.totalDescuentos)}</div>
-            {Object.entries(detalle.porMetodo as Record<string, string>).map(([m, v]) => (
-              <div key={m}>
-                {m}: {dinero(v)}
-              </div>
-            ))}
-            <div>Fondo inicial: {dinero(detalle.montoInicial)}</div>
-            <div>Retiros: {dinero(detalle.retiros)} · Ingresos: {dinero(detalle.ingresos)}</div>
-            <div className="font-bold">Efectivo esperado: {dinero(detalle.efectivoEsperado)}</div>
-          </div>
-        </Modal>
-      )}
+      {!turnos.length && <div className="p-6 text-center text-slate-500">No hay turnos en este período</div>}
+      {detalle && <DetalleTurno r={detalle} onCerrar={() => setDetalle(null)} />}
     </div>
+  );
+}
+
+function DetalleTurno({ r, onCerrar }: { r: ResumenTurno; onCerrar: () => void }) {
+  const dif = r.turno.diferencia !== null && r.turno.diferencia !== undefined ? Number(r.turno.diferencia) : null;
+  const conteo = Object.entries(r.conteo ?? {})
+    .filter(([, n]) => n > 0)
+    .sort(([a], [b]) => Number(b) - Number(a));
+  const fila = (a: string, b: string, cls = '') => (
+    <div className={`flex justify-between border-b py-1 ${cls}`}>
+      <span className="text-slate-600">{a}</span>
+      <b>{b}</b>
+    </div>
+  );
+  return (
+    <Modal titulo={`Turno de ${r.cajero ?? '—'} · ${r.caja ?? ''}`} onCerrar={onCerrar} ancho="max-w-4xl">
+      <div className="mb-3 text-sm text-slate-600">
+        Apertura {fechaHora(r.turno.abiertoEn)} · Cierre {fechaHora(r.turno.cerradoEn)}
+        {r.cerradoPor && r.cerradoPor !== r.cajero ? ` · cerrado por ${r.cerradoPor}` : ''}
+      </div>
+      <div className="grid grid-cols-2 gap-6">
+        <div>
+          <div className="mb-1 font-bold">Ventas</div>
+          {fila(`Recibos (${r.cantidadVentas})`, dinero(r.totalVentas))}
+          {fila('Descuentos', dinero(r.totalDescuentos))}
+          {fila(`Anuladas (${r.anuladas})`, dinero(r.totalAnulado))}
+          <div className="mb-1 mt-3 font-bold">Formas de pago</div>
+          {Object.entries(r.porMetodo).map(([m, v]) => fila(nombreMetodo(m), dinero(v)))}
+        </div>
+        <div>
+          <div className="mb-1 font-bold">Efectivo</div>
+          {fila('Fondo inicial', dinero(r.montoInicial))}
+          {fila('+ Ingresos', dinero(r.ingresos))}
+          {fila('- Retiros', dinero(r.retiros))}
+          {fila('Esperado', dinero(r.efectivoEsperado))}
+          {r.turno.montoCierreDeclarado != null && fila('Contado', dinero(r.turno.montoCierreDeclarado))}
+          {dif !== null && (
+            <div className={`mt-2 rounded-xl p-2 text-center text-lg font-bold ${dif === 0 ? 'bg-marca-100 text-marca-700' : 'bg-red-100 text-red-700'}`}>
+              {dif === 0 ? 'Caja cuadrada' : `${dif > 0 ? 'Sobrante' : 'Faltante'}: ${dinero(Math.abs(dif))}`}
+            </div>
+          )}
+          {r.turno.estado === 'CERRADO' && (
+            <>
+              <div className="mb-1 mt-3 font-bold">Conteo</div>
+              {conteo.length ? (
+                conteo.map(([d, n]) => fila(`${n} × ${dinero(d)}`, dinero(Number(d) * n)))
+              ) : (
+                <div className="text-sm text-slate-500">Total escrito directo, sin detalle</div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+      {r.observacion && (
+        <div className="mt-4 rounded-xl bg-amber-50 p-3">
+          <b>Observación del cajero:</b> {r.observacion}
+        </div>
+      )}
+      {r.movimientos.length > 0 && (
+        <div className="mt-4">
+          <div className="mb-1 font-bold">Retiros e ingresos</div>
+          <table className="w-full text-left text-sm">
+            <thead className="text-slate-500">
+              <tr>
+                <th className="py-1">Hora</th>
+                <th>Tipo</th>
+                <th className="text-right">Monto</th>
+                <th className="pl-3">Motivo</th>
+                <th>Registró</th>
+                <th>Autorizó</th>
+              </tr>
+            </thead>
+            <tbody>
+              {r.movimientos.map((m) => (
+                <tr key={m.id} className="border-t">
+                  <td className="py-1">{new Date(m.creadoEn).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</td>
+                  <td>{m.tipo === 'RETIRO' ? 'Retiro' : 'Ingreso'}</td>
+                  <td className="text-right">{dinero(m.monto)}</td>
+                  <td className="pl-3">{m.motivo}</td>
+                  <td>{m.usuario ?? '—'}</td>
+                  <td>{m.autorizadoPor ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="mt-4 flex justify-end gap-2">
+        {r.turno.estado === 'CERRADO' && (
+          <Boton onClick={() => imprimirReporteCierre(r, true).catch((e) => toast.error(`Impresora: ${e.message}`))}>Reimprimir reporte Z</Boton>
+        )}
+        <Boton variante="primario" onClick={onCerrar}>
+          Cerrar
+        </Boton>
+      </div>
+    </Modal>
   );
 }

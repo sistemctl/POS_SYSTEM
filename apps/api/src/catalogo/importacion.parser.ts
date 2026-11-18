@@ -53,7 +53,7 @@ const SINONIMOS: Record<string, (typeof COLUMNAS)[number]> = {
   por_peso: 'pesable',
 };
 
-export const UNIDADES = ['UND', 'KG', 'LT', 'PAQ', 'CJA'];
+export const UNIDADES = ['UND', 'KG', 'LB', 'LT', 'PAQ', 'CJA'];
 
 export interface FilaProducto {
   fila: number;
@@ -301,6 +301,7 @@ export function normalizarFilas(
     let unidad = texto(get('unidad'))?.toUpperCase() ?? null;
     if (unidad && ['UN', 'UNIDAD', 'U', 'UND.', 'UNID'].includes(unidad)) unidad = 'UND';
     if (unidad && ['KILO', 'KILOS', 'KILOGRAMO', 'KGS'].includes(unidad)) unidad = 'KG';
+    if (unidad && ['LIBRA', 'LIBRAS', 'LBS', 'LB.'].includes(unidad)) unidad = 'LB';
     if (unidad && !UNIDADES.includes(unidad)) {
       p('unidad', 'error', `Unidad "${unidad}" no válida (use ${UNIDADES.join(', ')})`);
       unidad = null;
@@ -335,7 +336,8 @@ export function normalizarFilas(
       costo: num('costo', { decimales: 4 }),
       impuestoCodigo,
       tasaImpuesto,
-      unidad: pesable ? 'KG' : unidad,
+      // Pesables: KG o LB. Sin columna unidad se deja null para no pisar la unidad existente.
+      unidad: pesable ? (unidad === null ? null : unidad === 'LB' ? 'LB' : 'KG') : unidad,
       pesable,
       plu,
       stockMinimo: num('stock_minimo', { decimales: 3 }),

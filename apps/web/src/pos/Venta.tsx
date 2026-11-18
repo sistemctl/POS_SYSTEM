@@ -201,7 +201,7 @@ export default function Venta() {
         import('../lib/logs').then((m) => m.reportarError(`Producto no encontrado: ${codigo}`, undefined, 'warn')).catch(() => undefined);
         return;
       }
-      agregarProducto(r.producto, r.cantidad ?? (r.producto.pesable ? undefined : undefined));
+      agregarProducto(r.producto, r.cantidad);
     },
     !!turno && (modal === null || modal.tipo === 'buscar'),
   );
@@ -480,21 +480,29 @@ export default function Venta() {
                 <div
                   key={l.key}
                   onClick={() => venta.seleccionar(l.key)}
-                  className={`flex items-center gap-3 rounded-xl border-l-4 px-3 py-2 transition-colors ${
+                  className={`flex items-center gap-2 rounded-xl border-l-4 px-2 py-1.5 transition-colors ${
                     sel ? 'linea-nueva border-marca-600 bg-marca-50 shadow-sm' : 'border-transparent hover:bg-slate-50'
                   }`}
                 >
+                  {/* Cantidad: ancho fijo para que todos los nombres queden alineados */}
                   <div
-                    className={`flex h-12 min-w-12 shrink-0 items-center justify-center rounded-xl px-2 text-lg font-extrabold ${
+                    className={`flex h-12 w-[4.5rem] shrink-0 flex-col items-center justify-center rounded-xl leading-none font-extrabold ${
                       sel ? 'bg-marca-600 text-white' : 'bg-slate-100 text-slate-700'
                     }`}
                   >
-                    {l.pesable ? fmtCantidad(l.cantidad, l.unidad) : `${Number(l.cantidad)}×`}
+                    {l.pesable ? (
+                      <>
+                        <span className="text-base">{Number(l.cantidad).toFixed(3)}</span>
+                        <span className="mt-0.5 text-xs font-semibold opacity-75">{l.unidad.toLowerCase()}</span>
+                      </>
+                    ) : (
+                      <span className="text-lg">{Number(l.cantidad)}×</span>
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-lg font-semibold text-slate-900">{l.nombre}</div>
-                    <div className="text-sm text-slate-500">
-                      {fmtCantidad(l.cantidad, l.unidad)} × {dinero(l.precioUnitario)}
+                    <div className="truncate text-sm text-slate-500">
+                      {l.pesable ? `${dinero(l.precioUnitario)} / ${l.unidad.toLowerCase()}` : `${dinero(l.precioUnitario)} c/u`}
                       {l.precioUnitario !== l.precioLista && <span className="ml-1 text-amber-600">(precio modificado)</span>}
                       {Number(l.descuentoPorcentaje) > 0 && <span className="ml-1 text-amber-600">-{l.descuentoPorcentaje}%</span>}
                       {calc?.promocionId && (
@@ -666,7 +674,7 @@ export default function Venta() {
                   </span>
                   <span className="relative mt-1 rounded-full bg-marca-50 px-2.5 py-0.5 text-sm font-bold text-marca-700">
                     {dinero(p.precio)}
-                    {p.pesable ? '/kg' : ''}
+                    {p.pesable ? `/${p.unidad.toLowerCase()}` : ''}
                   </span>
                   {p.pesable && (
                     <span className="absolute right-1.5 top-2.5 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">⚖ PESO</span>
@@ -830,6 +838,7 @@ export default function Venta() {
       {modal?.tipo === 'cerrarTurno' && (
         <CerrarTurnoModal
           onCerrar={() => setModal(null)}
+          onVerEnEspera={() => setModal({ tipo: 'suspendidas' })}
           onCerrado={() => {
             setModal(null);
             setTurno(null);

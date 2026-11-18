@@ -37,9 +37,19 @@ function RequiereSesion({ children }: { children: JSX.Element }) {
 export default function App() {
   // Moneda, colores y logo del sistema (con copia local para arrancar sin servidor)
   useEffect(() => {
-    if (configurado()) useParametros.getState().cargar().catch(() => undefined);
+    // Si el servidor aún está arrancando, reintentar hasta obtenerlos
+    let t: number | undefined;
+    const cargarParametros = () =>
+      useParametros
+        .getState()
+        .cargar()
+        .catch(() => {
+          t = window.setTimeout(cargarParametros, 5_000);
+        });
+    if (configurado()) cargarParametros();
     // Impresora, balanza y escáner configurados desde Administración → Sucursales y cajas
     if (configurado()) iniciarHardwareRemoto();
+    return () => window.clearTimeout(t);
   }, []);
   return (
     <HashRouter>

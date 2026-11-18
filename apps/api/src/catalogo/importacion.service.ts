@@ -367,7 +367,7 @@ export class ImportacionService {
       sku: f.sku ?? f.codigos[0],
       nombre: f.nombre!,
       categoriaId,
-      unidad: pesable ? 'KG' : (f.unidad ?? 'UND'),
+      unidad: pesable ? (f.unidad === 'LB' ? 'LB' : 'KG') : (f.unidad ?? 'UND'),
       pesable,
       plu: f.plu,
       precio: f.precio!,
@@ -427,7 +427,7 @@ export class ImportacionService {
           data.impuestoCodigo = f.impuestoCodigo;
         }
         if (f.pesable !== null) data.pesable = f.pesable;
-        if (f.pesable) data.unidad = 'KG';
+        if (f.pesable) data.unidad = f.unidad ?? (existente.unidad === 'LB' ? 'LB' : 'KG');
         else if (f.unidad !== null) data.unidad = f.unidad;
         if (f.plu !== null) data.plu = f.plu;
         if (f.stockMinimo !== null) data.stockMinimo = f.stockMinimo;
@@ -527,7 +527,7 @@ export class ImportacionService {
       ['precio', `Precio de venta CON impuesto incluido. ${params.regional.decimales === 0 ? 'Sin decimales.' : 'Con 2 decimales.'} Obligatorio para productos nuevos.`],
       ['costo', 'Costo unitario (opcional).'],
       ['impuesto', `Código o tasa del impuesto: ${params.regional.impuestos.map((i) => `${i.codigo} (${i.tasa}%)`).join(', ')}. Vacío = ${impDef}.`],
-      ['unidad', `${UNIDADES.join(', ')}. Los productos pesables usan KG.`],
+      ['unidad', `${UNIDADES.join(', ')}. Los productos pesables usan KG (precio por kilo) o LB (precio por libra).`],
       ['pesable', 'SI si se vende por peso en la balanza.'],
       ['plu', 'Código PLU de la balanza etiquetadora (solo números, hasta 6 dígitos).'],
       ['stock_minimo', 'Cantidad mínima para alertas de reposición.'],

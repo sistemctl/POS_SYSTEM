@@ -195,7 +195,9 @@ function configurarActualizaciones() {
       autoUpdater.quitAndInstall();
     }
   });
-  autoUpdater.checkForUpdates().catch(() => undefined);
+  // Si el servidor de tienda aún está arrancando, reintentar cada 2 min hasta poder consultarlo
+  const primera = () => autoUpdater.checkForUpdates().catch(() => setTimeout(primera, 2 * 60 * 1000));
+  primera();
   setInterval(() => autoUpdater.checkForUpdates().catch(() => undefined), 60 * 60 * 1000);
 }
 

@@ -125,12 +125,17 @@ export function AutorizacionModal() {
           {!usuarios.length && <div className="col-span-3 text-slate-500">No hay supervisores disponibles.</div>}
         </div>
       ) : (
-        <div className="mx-auto max-w-sm">
-          <div className="mb-2 text-center text-lg">
-            PIN de <b>{elegido.nombre}</b>
-          </div>
-          <div className="mb-3 h-14 rounded-xl border-2 border-slate-300 text-center text-4xl tracking-[0.5em]">
-            {'•'.repeat(pin.length)}
+        <div className="grid grid-cols-2 items-start gap-5">
+          <div className="flex flex-col gap-3">
+            <div className="text-center text-lg">
+              PIN de <b>{elegido.nombre}</b>
+            </div>
+            <div className="h-14 rounded-xl border-2 border-slate-300 text-center text-4xl leading-[3.25rem] tracking-[0.5em]">
+              {'•'.repeat(pin.length)}
+            </div>
+            <Boton className="w-full" onClick={() => setElegido(null)}>
+              Elegir otro supervisor
+            </Boton>
           </div>
           <NumPad
             valor={pin}
@@ -139,9 +144,6 @@ export function AutorizacionModal() {
             maxLen={6}
             onEnter={() => pin.length >= 4 && !enviando && enviar({ supervisorId: elegido.id, pin })}
           />
-          <Boton className="mt-2 w-full" onClick={() => setElegido(null)}>
-            Elegir otro supervisor
-          </Boton>
         </div>
       )}
       {error && <div className="mt-4 rounded-xl bg-red-100 p-3 text-center text-lg font-semibold text-red-700">{error}</div>}

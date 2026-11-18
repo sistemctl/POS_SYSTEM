@@ -4,3 +4,4 @@ export * from './barcode';
 export * from './types';
 export * from './ids';
 export * from './parametros';
+export * from './peso';
