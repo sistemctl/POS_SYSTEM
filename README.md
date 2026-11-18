@@ -66,7 +66,12 @@ Todo error que ve el cajero queda registrado en el servidor de la tienda (Admini
 «Estado de sucursales» avisa cuántos hubo en las últimas 24 h.
 
 ## Atajos de la caja
-F1 buscar · F2 cantidad · F4 pesar · F6 en espera · F7 recuperar · F8 descuento · F9 quitar · F10 cobrar · F11 ventas · F12 cerrar turno.
+F1 buscar · F2 cantidad · F3 ayuda · F4 pesar · F5 más opciones · F6 en espera · F7 recuperar · F8 descuento · F9 quitar · F10 cobrar · F11 ventas · F12 cerrar turno.
+
+La barra de la caja muestra solo lo de cada venta (Buscar, Cantidad, Quitar, En espera/Recuperar, COBRAR);
+descuento, cambio de precio, reimprimir, cajón, retiros, ventas del turno y cancelar venta están en **Más opciones**.
+Cobro rápido: si el primer pago en efectivo (billete o «Pago exacto») o con tarjeta/Nequi cubre el total, la venta se
+registra en ese mismo toque. Pagos combinados y montos escritos a mano se confirman con «Finalizar venta».
 
 ## Producción
 1. **Servidor central**: PostgreSQL + `setup-db.ps1 -Modo central`, `.env.central`, API como servicio de Windows

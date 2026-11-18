@@ -10,21 +10,55 @@ import { useSesion } from '../store/sesion';
 import { Boton, toast } from '../components/ui';
 import { EstadoConexion } from '../components/EstadoConexion';
 
-const MENU: { ruta: string; texto: string; permiso: Permiso }[] = [
-  { ruta: 'reportes', texto: 'Reportes', permiso: PERMISOS.REPORTE_SUCURSAL },
-  { ruta: 'productos', texto: 'Productos', permiso: PERMISOS.PRODUCTO_VER },
-  { ruta: 'promociones', texto: 'Promociones', permiso: PERMISOS.PRODUCTO_VER },
-  { ruta: 'recibir', texto: 'Recibir mercancía', permiso: PERMISOS.COMPRA_REGISTRAR },
-  { ruta: 'inventario', texto: 'Inventario', permiso: PERMISOS.INVENTARIO_VER },
-  { ruta: 'turnos', texto: 'Turnos / Arqueos', permiso: PERMISOS.TURNO_VER_TODOS },
-  { ruta: 'usuarios', texto: 'Usuarios', permiso: PERMISOS.USUARIO_GESTIONAR },
-  { ruta: 'roles', texto: 'Roles y permisos', permiso: PERMISOS.USUARIO_GESTIONAR },
-  { ruta: 'sucursales', texto: 'Sucursales y cajas', permiso: PERMISOS.SUCURSAL_GESTIONAR },
-  { ruta: 'monitoreo', texto: 'Estado de sucursales', permiso: PERMISOS.MONITOREO_VER },
-  { ruta: 'errores', texto: 'Errores de caja', permiso: PERMISOS.MONITOREO_VER },
-  { ruta: 'backups', texto: 'Copias de seguridad', permiso: PERMISOS.BACKUP_GESTIONAR },
-  { ruta: 'auditoria', texto: 'Auditoría', permiso: PERMISOS.REPORTE_SUCURSAL },
-  { ruta: 'sistema', texto: 'Configuración del sistema', permiso: PERMISOS.PRODUCTO_VER },
+interface ItemMenu {
+  ruta: string;
+  texto: string;
+  /** Explicación corta que aparece debajo del nombre */
+  ayuda: string;
+  permiso: Permiso;
+}
+
+/** Menú agrupado por tarea, para que cada persona encuentre rápido lo que necesita. */
+const MENU: { grupo: string; items: ItemMenu[] }[] = [
+  {
+    grupo: 'Ventas',
+    items: [
+      { ruta: 'reportes', texto: 'Informes de ventas', ayuda: 'Cuánto se vendió hoy y por cajero', permiso: PERMISOS.REPORTE_SUCURSAL },
+      { ruta: 'turnos', texto: 'Cierres de caja', ayuda: 'Turnos, arqueos y diferencias', permiso: PERMISOS.TURNO_VER_TODOS },
+    ],
+  },
+  {
+    grupo: 'Productos y bodega',
+    items: [
+      { ruta: 'productos', texto: 'Productos y precios', ayuda: 'Crear, importar de Excel, cambiar precios', permiso: PERMISOS.PRODUCTO_VER },
+      { ruta: 'promociones', texto: 'Promociones', ayuda: '2x1, % de descuento, precio por cantidad', permiso: PERMISOS.PRODUCTO_VER },
+      { ruta: 'recibir', texto: 'Recibir mercancía', ayuda: 'Entrada de pedidos de proveedores', permiso: PERMISOS.COMPRA_REGISTRAR },
+      { ruta: 'inventario', texto: 'Inventario', ayuda: 'Existencias y ajustes', permiso: PERMISOS.INVENTARIO_VER },
+    ],
+  },
+  {
+    grupo: 'Personal',
+    items: [
+      { ruta: 'usuarios', texto: 'Usuarios', ayuda: 'Cajeros, supervisores, claves y PIN', permiso: PERMISOS.USUARIO_GESTIONAR },
+      { ruta: 'roles', texto: 'Roles y permisos', ayuda: 'Qué puede hacer cada cargo', permiso: PERMISOS.USUARIO_GESTIONAR },
+    ],
+  },
+  {
+    grupo: 'Tiendas y control',
+    items: [
+      { ruta: 'sucursales', texto: 'Tiendas y cajas', ayuda: 'Sucursales, cajas, impresora y báscula', permiso: PERMISOS.SUCURSAL_GESTIONAR },
+      { ruta: 'monitoreo', texto: 'Estado de las tiendas', ayuda: 'Conexión y sincronización', permiso: PERMISOS.MONITOREO_VER },
+      { ruta: 'errores', texto: 'Errores de caja', ayuda: 'Problemas que vieron los cajeros', permiso: PERMISOS.MONITOREO_VER },
+      { ruta: 'auditoria', texto: 'Auditoría', ayuda: 'Quién autorizó descuentos y anulaciones', permiso: PERMISOS.REPORTE_SUCURSAL },
+    ],
+  },
+  {
+    grupo: 'Sistema',
+    items: [
+      { ruta: 'sistema', texto: 'Configuración', ayuda: 'País, IVA, logo, recibo y caja', permiso: PERMISOS.PRODUCTO_VER },
+      { ruta: 'backups', texto: 'Copias de seguridad', ayuda: 'Respaldos de la base de datos', permiso: PERMISOS.BACKUP_GESTIONAR },
+    ],
+  },
 ];
 
 export function useModoServidor() {
@@ -61,15 +95,27 @@ export default function AdminLayout() {
           <div className="text-sm opacity-70">{usuario.nombre}</div>
           <div className="mt-1 text-xs opacity-60">Servidor {modo === 'central' ? 'CENTRAL' : modo === 'store' ? 'de TIENDA' : '…'}</div>
         </div>
-        {MENU.filter((m) => puede(m.permiso)).map((m) => (
-          <NavLink
-            key={m.ruta}
-            to={m.ruta}
-            className={({ isActive }) => `flex min-h-[52px] items-center rounded-lg px-3 text-lg ${isActive ? 'bg-marca-600' : 'hover:bg-slate-800'}`}
-          >
-            {m.texto}
-          </NavLink>
-        ))}
+        {MENU.map((g) => {
+          const visibles = g.items.filter((m) => puede(m.permiso));
+          if (!visibles.length) return null;
+          return (
+            <div key={g.grupo} className="mb-2">
+              <div className="px-3 pb-1 pt-2 text-xs font-bold uppercase tracking-wider text-slate-400">{g.grupo}</div>
+              {visibles.map((m) => (
+                <NavLink
+                  key={m.ruta}
+                  to={m.ruta}
+                  className={({ isActive }) =>
+                    `flex min-h-[52px] flex-col justify-center rounded-lg px-3 py-1 ${isActive ? 'bg-marca-600' : 'hover:bg-slate-800'}`
+                  }
+                >
+                  <span className="text-lg leading-tight">{m.texto}</span>
+                  <span className="text-xs leading-tight opacity-70">{m.ayuda}</span>
+                </NavLink>
+              ))}
+            </div>
+          );
+        })}
         <div className="flex-1" />
         {cfg.cajaId && usuario.permisos.includes(PERMISOS.VENTA_CREAR) && (
           <Boton variante="primario" onClick={() => nav('/venta')}>

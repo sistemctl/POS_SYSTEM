@@ -289,6 +289,8 @@ function Regional({ p, setP, set }: { p: Parametros; setP: (p: Parametros) => vo
         </div>
       )}
 
+      <CobraImpuesto p={p} set={set} />
+
       <div>
         <div className="font-semibold">Impuestos</div>
         <div className="mb-2 text-sm text-slate-500">
@@ -339,6 +341,35 @@ function Regional({ p, setP, set }: { p: Parametros; setP: (p: Parametros) => vo
         </table>
         <Boton className="mt-2" onClick={() => set('regional', { impuestos: [...r.impuestos, { codigo: `IMP${r.impuestos.length + 1}`, nombre: 'Nuevo', tasa: 0 }] })}>
           + Agregar impuesto
+        </Boton>
+      </div>
+    </div>
+  );
+}
+
+/** Interruptor simple: cobrar o no el impuesto (IVA). "No" deja un único impuesto «Sin IVA» al 0 %. */
+function CobraImpuesto({ p, set }: { p: Parametros; set: Setter }) {
+  const r = p.regional;
+  const nombre = r.nombreImpuesto || 'IVA';
+  const cobra = r.impuestos.some((i) => i.tasa > 0);
+  const preset = Object.values(PRESETS_PAIS).find((x) => x.pais === r.pais && x.monedaCodigo === r.monedaCodigo);
+  const noCobrar = () => set('regional', { impuestos: [{ codigo: 'EXENTO', nombre: `Sin ${nombre}`, tasa: 0 }], impuestoPorDefecto: 'EXENTO' });
+  const siCobrar = () =>
+    preset
+      ? set('regional', { impuestos: preset.impuestos.map((i) => ({ ...i })), impuestoPorDefecto: preset.impuestoPorDefecto })
+      : set('regional', { impuestos: [{ codigo: 'IVA', nombre, tasa: 19 }, ...r.impuestos.filter((i) => i.codigo !== 'IVA')], impuestoPorDefecto: 'IVA' });
+  return (
+    <div className="rounded-xl border-2 border-slate-200 p-4">
+      <div className="text-lg font-semibold">¿Su negocio cobra {nombre}?</div>
+      <div className="mb-3 text-sm text-slate-500">
+        Si elige <b>No</b>, todos los productos quedan sin {nombre} y el ticket no muestra la línea de {nombre}. Los precios de venta no cambian. Toque «Guardar cambios» para aplicarlo.
+      </div>
+      <div className="flex gap-3">
+        <Boton variante={cobra ? 'primario' : 'secundario'} className="w-56 text-lg" onClick={() => !cobra && siCobrar()}>
+          Sí, cobro {nombre}
+        </Boton>
+        <Boton variante={!cobra ? 'primario' : 'secundario'} className="w-56 text-lg" onClick={() => cobra && noCobrar()}>
+          No cobro {nombre}
         </Boton>
       </div>
     </div>

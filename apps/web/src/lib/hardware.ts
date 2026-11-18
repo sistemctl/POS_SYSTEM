@@ -127,7 +127,7 @@ export function ticketCuerpoHtml(t: TicketData, ancho: 58 | 80 = 80): string {
   return `<div style="font-family:monospace;font-size:12px;width:${ancho === 58 ? 48 : 72}mm;color:#000;background:#fff;padding:2mm">
     <div class="c" style="text-align:center">${logo}<b style="font-size:15px">${esc(t.empresa)}</b><br>${esc(t.sucursal)}
     ${t.direccion ? '<br>' + esc(t.direccion) : ''}${t.telefono ? '<br>Tel: ' + esc(t.telefono) : ''}
-    ${t.ruc ? `<br>${esc(t.etiquetaFiscal ?? 'RUC')}: ${esc(t.ruc)}` : ''}
+    ${t.ruc ? `<br>${esc(t.etiquetaFiscal ?? 'NIT')}: ${esc(t.ruc)}` : ''}
     ${(t.encabezado ?? []).map((l) => '<br>' + esc(l)).join('')}</div>
     <hr style="border:0;border-top:1px dashed #000">${t.anulada ? '<div style="text-align:center;font-weight:bold">*** ANULADO ***</div>' : ''}${t.reimpresion ? '<div style="text-align:center">REIMPRESIÓN</div>' : ''}
     Ticket: ${esc(t.numero)}<br>Fecha: ${new Date(t.fecha).toLocaleString('es')}<br>Caja: ${esc(t.caja)} · ${esc(t.cajero)}<hr style="border:0;border-top:1px dashed #000">
@@ -136,7 +136,7 @@ export function ticketCuerpoHtml(t: TicketData, ancho: 58 | 80 = 80): string {
     ${Number(t.descuento) > 0 && t.mostrarAhorro !== false ? fila('Usted ahorró', m(t.descuento)) : ''}
     <tr style="font-size:16px;font-weight:bold"><td>TOTAL</td><td style="text-align:right">${m(t.total)}</td></tr>
     ${t.pagos.map((p) => fila(esc(p.metodo), m(p.monto))).join('')}
-    ${Number(t.vuelto) > 0 ? fila('<b>Vuelto</b>', `<b>${m(t.vuelto)}</b>`) : ''}</table><hr style="border:0;border-top:1px dashed #000">
+    ${Number(t.vuelto) > 0 ? fila('<b>Cambio</b>', `<b>${m(t.vuelto)}</b>`) : ''}</table><hr style="border:0;border-top:1px dashed #000">
     <div style="text-align:center">${esc(t.pie ?? '').replace(/\n/g, '<br>')}</div>
     ${t.qr ? `<div style="text-align:center;margin-top:2mm;border:1px solid #000;padding:2mm;font-size:10px">[ QR ]<br>${esc(t.qr)}</div>` : ''}</div>`;
 }

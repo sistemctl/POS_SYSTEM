@@ -1,13 +1,129 @@
 import { useEffect, useState } from 'react';
 import Decimal from 'decimal.js';
-import { PERMISOS, type TicketData } from '@pos/shared';
+import { denominacionesMoneda, PERMISOS, type TicketData } from '@pos/shared';
 import { get, post } from '../lib/api';
 import { dinero, leerConfig } from '../lib/config';
 import { abrirCajon, imprimirTicket } from '../lib/hardware';
+import { useParametros } from '../store/parametros';
 import { useSesion } from '../store/sesion';
 import { Boton, Modal, NumPad, toast } from '../components/ui';
 import { conAutorizacion, solicitarAutorizacion } from '../components/Autorizacion';
 import { TecladoVirtual } from '../components/TecladoVirtual';
+import { nombreEstadoVenta, nombreMetodo } from './metodos';
+import { ATAJOS } from './shortcuts';
+
+// ───────── Más opciones: lo que no se usa en cada venta ─────────
+export interface OpcionCaja {
+  texto: string;
+  ayuda: string;
+  onClick: () => void;
+  /** Si viene, la opción no se puede usar y se muestra este motivo */
+  bloqueada?: string | null;
+  peligro?: boolean;
+  atajo?: string;
+}
+
+export function MasOpcionesModal({ opciones, onCerrar }: { opciones: OpcionCaja[]; onCerrar: () => void }) {
+  return (
+    <Modal titulo="Más opciones" onCerrar={onCerrar} ancho="max-w-4xl">
+      <div className="grid grid-cols-2 gap-3">
+        {opciones.map((o) => (
+          <button
+            key={o.texto}
+            disabled={!!o.bloqueada}
+            onClick={o.onClick}
+            className={`btn-touch flex min-h-[88px] flex-col items-start justify-center border-2 px-4 py-2 text-left ${
+              o.peligro ? 'border-red-200 bg-red-50 text-red-800' : 'border-slate-200 bg-white text-slate-800'
+            }`}
+          >
+            <span className="flex w-full items-center justify-between text-xl">
+              {o.texto}
+              {o.atajo && <span className="text-xs font-normal text-slate-400">{o.atajo}</span>}
+            </span>
+            <span className={`text-sm font-normal ${o.bloqueada ? 'text-amber-700' : 'text-slate-500'}`}>{o.bloqueada ?? o.ayuda}</span>
+          </button>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
+// ───────── Ayuda para el cajero ─────────
+const PASOS_AYUDA: { titulo: string; pasos: string[] }[] = [
+  {
+    titulo: 'Vender',
+    pasos: [
+      'Pase el producto por el lector, o tóquelo en la pantalla.',
+      'Si no lo encuentra, toque «Buscar» y escriba parte del nombre.',
+      'Para llevar varios iguales: «Cantidad», escriba el número y luego pase el producto.',
+      'Para quitar algo: tóquelo en la lista y luego «Quitar».',
+    ],
+  },
+  {
+    titulo: 'Cobrar',
+    pasos: [
+      'Toque el botón verde «COBRAR».',
+      'Efectivo: toque el billete que le dio el cliente. La venta queda lista y sale el cambio en grande.',
+      'Tarjeta o Nequi: toque la forma de pago y luego «Cobrar con…».',
+      'Si paga con dos formas (ej. efectivo + Nequi), agregue cada parte y toque «Finalizar venta».',
+    ],
+  },
+  {
+    titulo: 'Cliente que olvidó algo',
+    pasos: ['Toque «En espera»: la venta se guarda y puede atender al siguiente.', 'Cuando vuelva, toque «Recuperar» y elija su venta.'],
+  },
+  {
+    titulo: 'Fin del día',
+    pasos: ['Termine la venta en curso.', 'Toque «Cerrar turno», cuente billetes y monedas, y toque «Cerrar turno».'],
+  },
+];
+
+export function AyudaModal({ onCerrar }: { onCerrar: () => void }) {
+  const atajos: [string, string][] = [
+    [ATAJOS.buscar, 'Buscar producto'],
+    [ATAJOS.cantidad, 'Cantidad'],
+    [ATAJOS.ayuda, 'Esta ayuda'],
+    [ATAJOS.pesar, 'Pesar'],
+    [ATAJOS.masOpciones, 'Más opciones'],
+    [ATAJOS.suspender, 'Poner en espera'],
+    [ATAJOS.recuperar, 'Recuperar venta'],
+    [ATAJOS.descuento, 'Descuento'],
+    [ATAJOS.quitar, 'Quitar producto'],
+    [ATAJOS.cobrar, 'Cobrar'],
+    [ATAJOS.ventas, 'Ventas del turno'],
+    [ATAJOS.cerrarTurno, 'Cerrar turno'],
+  ];
+  return (
+    <Modal titulo="¿Cómo usar la caja?" onCerrar={onCerrar} ancho="max-w-5xl">
+      <div className="grid grid-cols-2 gap-4">
+        {PASOS_AYUDA.map((s) => (
+          <div key={s.titulo} className="rounded-xl bg-slate-50 p-4">
+            <div className="mb-2 text-xl font-bold text-marca-700">{s.titulo}</div>
+            <ol className="list-decimal space-y-1 pl-5 text-lg">
+              {s.pasos.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ol>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 rounded-xl border-2 border-slate-200 p-4">
+        <div className="mb-2 font-bold">Teclas rápidas (teclado)</div>
+        <div className="grid grid-cols-4 gap-x-4 gap-y-1">
+          {atajos.map(([k, t]) => (
+            <div key={k}>
+              <span className="mr-2 inline-block w-10 rounded bg-slate-200 text-center font-mono font-bold">{k}</span>
+              {t}
+            </div>
+          ))}
+        </div>
+      </div>
+      <Boton variante="primario" className="mt-4 w-full text-xl" onClick={onCerrar}>
+        Entendido
+      </Boton>
+    </Modal>
+  );
+}
 
 // ───────── Ventas del turno: reimprimir y anular ─────────
 export function VentasTurnoModal({ onCerrar }: { onCerrar: () => void }) {
@@ -65,7 +181,7 @@ export function VentasTurnoModal({ onCerrar }: { onCerrar: () => void }) {
       <table className="w-full text-lg">
         <thead>
           <tr className="border-b text-left text-sm text-slate-500">
-            <th className="p-2">Ticket</th>
+            <th className="p-2">Recibo</th>
             <th>Hora</th>
             <th className="text-right">Total</th>
             <th>Estado</th>
@@ -78,7 +194,7 @@ export function VentasTurnoModal({ onCerrar }: { onCerrar: () => void }) {
               <td className="p-2 font-mono">{v.numeroCompleto}</td>
               <td>{new Date(v.fecha).toLocaleTimeString('es')}</td>
               <td className="text-right font-bold">{dinero(v.total)}</td>
-              <td className={v.estado === 'ANULADA' ? 'text-red-600' : 'text-marca-700'}>{v.estado}</td>
+              <td className={`font-semibold ${v.estado === 'ANULADA' ? 'text-red-600' : 'text-marca-700'}`}>{nombreEstadoVenta(v.estado)}</td>
               <td className="flex justify-end gap-2 p-1">
                 <Boton className="h-12 min-h-0" onClick={() => reimprimir(v.id)}>
                   Reimprimir
@@ -195,10 +311,15 @@ export function SuspendidasModal({ onRecuperar, onCerrar }: { onRecuperar: (data
 }
 
 // ───────── Cierre de turno con arqueo ─────────
-const DENOMINACIONES = ['200', '100', '50', '20', '10', '5', '2', '1', '0.50', '0.20', '0.10'];
-
 export function CerrarTurnoModal({ onCerrar, onCerrado }: { onCerrar: () => void; onCerrado: () => void }) {
   const turno = useSesion((s) => s.turno)!;
+  const regional = useParametros((s) => s.p.regional);
+  const dec = regional.decimales;
+  const { billetes, monedas } = denominacionesMoneda(regional.monedaCodigo);
+  const grupos: { titulo: string; valores: string[] }[] = [
+    { titulo: 'Billetes', valores: billetes.map(String) },
+    { titulo: 'Monedas', valores: monedas.map(String) },
+  ];
   const [conteo, setConteo] = useState<Record<string, number>>({});
   const [editando, setEditando] = useState<string | null>(null);
   const [valor, setValor] = useState('');
@@ -225,9 +346,9 @@ export function CerrarTurnoModal({ onCerrar, onCerrado }: { onCerrar: () => void
     return (
       <Modal titulo="Turno cerrado" ancho="max-w-xl">
         <div className="space-y-2 text-xl">
-          <Fila a="Ventas" b={`${resultado.cantidadVentas} tickets · ${dinero(resultado.totalVentas)}`} />
+          <Fila a="Ventas" b={`${resultado.cantidadVentas} recibos · ${dinero(resultado.totalVentas)}`} />
           {Object.entries(resultado.porMetodo as Record<string, string>).map(([m, v]) => (
-            <Fila key={m} a={m} b={dinero(v)} />
+            <Fila key={m} a={nombreMetodo(m)} b={dinero(v)} />
           ))}
           <Fila a="Efectivo esperado" b={dinero(resultado.efectivoEsperado)} />
           <Fila a="Efectivo contado" b={dinero(resultado.montoDeclarado)} />
@@ -246,24 +367,33 @@ export function CerrarTurnoModal({ onCerrar, onCerrado }: { onCerrar: () => void
     <Modal titulo="Cerrar turno — Arqueo de caja" onCerrar={onCerrar} ancho="max-w-5xl">
       <div className="grid grid-cols-[1fr_340px] gap-5">
         <div>
-          <p className="mb-3 text-slate-600">Cuente el efectivo y toque cada denominación para ingresar la cantidad.</p>
-          <div className="grid grid-cols-3 gap-2">
-            {DENOMINACIONES.map((d) => (
-              <button
-                key={d}
-                onClick={() => {
-                  setEditando(d);
-                  setValor(String(conteo[d] ?? ''));
-                }}
-                className={`btn-touch flex h-20 flex-col items-center justify-center border-2 ${editando === d ? 'border-marca-500 bg-marca-50' : 'border-slate-200 bg-white'}`}
-              >
-                <span className="text-xl">{dinero(d)}</span>
-                <span className="text-sm font-normal text-slate-500">
-                  × {conteo[d] ?? 0} = {dinero(new Decimal(d).mul(conteo[d] ?? 0).toFixed(2))}
-                </span>
-              </button>
-            ))}
-          </div>
+          <p className="mb-3 text-lg text-slate-600">
+            Cuente el efectivo del cajón. Toque cada billete o moneda y escriba <b>cuántos hay</b>.
+          </p>
+          {grupos.map((g) => (
+            <div key={g.titulo} className="mb-3">
+              <div className="mb-1 text-sm font-bold uppercase tracking-wide text-slate-500">{g.titulo}</div>
+              <div className="grid grid-cols-3 gap-2">
+                {g.valores.map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => {
+                      setEditando(d);
+                      setValor(String(conteo[d] ?? ''));
+                    }}
+                    className={`btn-touch flex h-20 flex-col items-center justify-center border-2 ${
+                      editando === d ? 'border-marca-500 bg-marca-50' : conteo[d] ? 'border-marca-100 bg-marca-50/50' : 'border-slate-200 bg-white'
+                    }`}
+                  >
+                    <span className="text-xl">{dinero(d)}</span>
+                    <span className="text-sm font-normal text-slate-500">
+                      {conteo[d] ?? 0} = {dinero(new Decimal(d).mul(conteo[d] ?? 0).toFixed(dec))}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
           {resumen && (
             <div className="mt-4 rounded-xl bg-slate-100 p-3 text-slate-700">
               Ventas del turno: <b>{resumen.cantidadVentas}</b> · Total <b>{dinero(resumen.totalVentas)}</b>
@@ -273,11 +403,12 @@ export function CerrarTurnoModal({ onCerrar, onCerrado }: { onCerrar: () => void
         <div className="space-y-3">
           <div className="rounded-xl bg-slate-900 p-3 text-center text-white">
             <div className="text-sm opacity-70">Total contado</div>
-            <div className="text-4xl font-bold">{dinero(total.toFixed(2))}</div>
+            <div className="text-4xl font-bold">{dinero(total.toFixed(dec))}</div>
           </div>
+          {!editando && <div className="rounded-xl bg-slate-50 p-3 text-center text-slate-600">Toque un billete o moneda de la izquierda</div>}
           {editando && (
             <>
-              <div className="text-center">Cantidad de {dinero(editando)}</div>
+              <div className="text-center text-lg">¿Cuántos de {dinero(editando)} hay?</div>
               <NumPad
                 valor={valor}
                 onChange={setValor}

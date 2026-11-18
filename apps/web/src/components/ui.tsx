@@ -4,12 +4,12 @@ import { create } from 'zustand';
 type Variante = 'primario' | 'secundario' | 'peligro' | 'alerta' | 'neutro' | 'info';
 
 const estilos: Record<Variante, string> = {
-  primario: 'bg-marca-600 text-white',
-  secundario: 'bg-white text-slate-800 border-2 border-slate-300',
-  peligro: 'bg-red-600 text-white',
-  alerta: 'bg-amber-500 text-white',
-  neutro: 'bg-slate-700 text-white',
-  info: 'bg-sky-600 text-white',
+  primario: 'bg-marca-600 text-white shadow-md shadow-marca-600/30 hover:brightness-105',
+  secundario: 'bg-white text-slate-800 border border-slate-200 shadow-sm hover:bg-slate-50',
+  peligro: 'bg-red-600 text-white shadow-md shadow-red-600/25 hover:brightness-105',
+  alerta: 'bg-amber-500 text-white shadow-md shadow-amber-500/25 hover:brightness-105',
+  neutro: 'bg-slate-800 text-white shadow-sm hover:bg-slate-700',
+  info: 'bg-sky-600 text-white shadow-md shadow-sky-600/25 hover:brightness-105',
 };
 
 export function Boton({
@@ -34,11 +34,17 @@ export function Modal({
   children,
   onCerrar,
   ancho = 'max-w-2xl',
+  alto,
 }: {
   titulo: string;
   children: ReactNode;
   onCerrar?: () => void;
   ancho?: string;
+  /**
+   * Altura fija (ej. 'h-[95vh]'). Úsela cuando el contenido cambia de tamaño (búsquedas):
+   * así la ventana no salta de lugar. El contenido queda en columna y debe tener su propia zona con scroll.
+   */
+  alto?: string;
 }) {
   useEffect(() => {
     if (!onCerrar) return;
@@ -48,8 +54,8 @@ export function Modal({
   }, [onCerrar]);
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
-      <div className={`w-full ${ancho} max-h-[95vh] flex flex-col rounded-2xl bg-white shadow-2xl`}>
-        <div className="flex items-center justify-between border-b px-5 py-3">
+      <div className={`w-full ${ancho} ${alto ?? 'max-h-[95vh]'} flex flex-col rounded-2xl bg-white shadow-2xl`}>
+        <div className="flex shrink-0 items-center justify-between border-b px-5 py-3">
           <h2 className="text-xl font-bold">{titulo}</h2>
           {onCerrar && (
             <button className="btn-touch text-3xl leading-none text-slate-500" onClick={onCerrar} aria-label="Cerrar">
@@ -57,9 +63,42 @@ export function Modal({
             </button>
           )}
         </div>
-        <div className="scroll-touch flex-1 p-5">{children}</div>
+        <div className={`flex-1 p-5 ${alto ? 'flex min-h-0 flex-col' : 'scroll-touch'}`}>{children}</div>
       </div>
     </div>
+  );
+}
+
+/** Pregunta Sí / No con botones grandes (reemplaza la ventana gris del navegador). */
+export function ConfirmarModal({
+  titulo,
+  mensaje,
+  textoSi = 'Sí',
+  textoNo = 'No, volver',
+  peligro = true,
+  onSi,
+  onNo,
+}: {
+  titulo: string;
+  mensaje?: ReactNode;
+  textoSi?: string;
+  textoNo?: string;
+  peligro?: boolean;
+  onSi: () => void;
+  onNo: () => void;
+}) {
+  return (
+    <Modal titulo={titulo} onCerrar={onNo} ancho="max-w-lg">
+      {mensaje && <div className="mb-5 text-xl text-slate-700">{mensaje}</div>}
+      <div className="grid grid-cols-2 gap-3">
+        <Boton className="h-20 text-xl" onClick={onNo}>
+          {textoNo}
+        </Boton>
+        <Boton variante={peligro ? 'peligro' : 'primario'} className="h-20 text-xl" onClick={onSi}>
+          {textoSi}
+        </Boton>
+      </div>
+    </Modal>
   );
 }
 

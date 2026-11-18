@@ -78,7 +78,8 @@ export default function LoginCaja() {
 
       <div className="flex flex-1 gap-6 overflow-hidden p-6">
         <div className="scroll-touch flex-1">
-          <h1 className="mb-4 text-2xl font-bold text-slate-700">Toque su nombre</h1>
+          <h1 className="mb-1 text-2xl font-bold text-slate-700">1. Toque su nombre</h1>
+          <p className="mb-4 text-lg text-slate-500">2. Escriba su clave (PIN) en el teclado de la derecha</p>
           <div className="grid grid-cols-3 gap-4 xl:grid-cols-4">
             {usuarios.map((u) => (
               <button
@@ -108,7 +109,7 @@ export default function LoginCaja() {
         </div>
 
         <div className="w-[360px] shrink-0 rounded-2xl bg-white p-5 shadow">
-          <div className="mb-2 text-center text-xl">{elegido ? elegido.nombre : 'Seleccione un usuario'}</div>
+          <div className="mb-2 text-center text-xl">{elegido ? `${elegido.nombre}: escriba su PIN` : '← Primero toque su nombre'}</div>
           <div className="mb-4 h-16 rounded-xl border-2 border-slate-300 text-center text-5xl leading-[3.5rem] tracking-[0.5em]">
             {'•'.repeat(pin.length)}
           </div>

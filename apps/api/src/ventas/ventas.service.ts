@@ -31,7 +31,7 @@ const METODO_TEXTO: Record<string, string> = {
   EFECTIVO: 'Efectivo',
   TARJETA: 'Tarjeta',
   TRANSFERENCIA: 'Transferencia',
-  BILLETERA: 'Billetera digital',
+  BILLETERA: 'Nequi / Daviplata',
   OTRO: 'Otro',
 };
 

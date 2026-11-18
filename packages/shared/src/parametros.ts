@@ -162,6 +162,20 @@ export const PRESETS_PAIS: Record<string, PresetRegional> = {
   },
 };
 
+/** Billetes y monedas de cada moneda, de mayor a menor, para el arqueo de cierre de turno. */
+const DENOMINACIONES: Record<string, { billetes: number[]; monedas: number[] }> = {
+  COP: { billetes: [100000, 50000, 20000, 10000, 5000, 2000], monedas: [1000, 500, 200, 100, 50] },
+  PEN: { billetes: [200, 100, 50, 20, 10], monedas: [5, 2, 1, 0.5, 0.2, 0.1] },
+  MXN: { billetes: [1000, 500, 200, 100, 50, 20], monedas: [10, 5, 2, 1, 0.5] },
+  USD: { billetes: [100, 50, 20, 10, 5, 1], monedas: [0.5, 0.25, 0.1, 0.05, 0.01] },
+  CLP: { billetes: [20000, 10000, 5000, 2000, 1000], monedas: [500, 100, 50, 10] },
+};
+
+/** Denominaciones para contar la caja según el código de moneda (COP por defecto). */
+export function denominacionesMoneda(codigo: string): { billetes: number[]; monedas: number[] } {
+  return DENOMINACIONES[codigo?.toUpperCase()] ?? DENOMINACIONES.COP;
+}
+
 /** Aplica un preset de país sobre unos parámetros (solo cambia la parte regional y los billetes). */
 export function aplicarPreset(p: Parametros, codigoPais: string): Parametros {
   const preset = PRESETS_PAIS[codigoPais];

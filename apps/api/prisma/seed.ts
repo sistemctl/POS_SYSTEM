@@ -38,8 +38,8 @@ async function main() {
       id: SUCURSAL_DEMO_ID,
       codigo: 'S01',
       nombre: 'Sucursal Principal',
-      direccion: 'Av. Principal 123',
-      pieTicket: '¡Gracias por su compra!\nConserve su ticket para cambios.',
+      direccion: 'Calle 10 # 5-23',
+      pieTicket: '¡Gracias por su compra!\nConserve su recibo para cambios.',
     },
   });
   // Desarrollo: vincular la tienda demo con el token de .env.store
@@ -103,35 +103,39 @@ async function main() {
     cat[nombre] = e?.id ?? (await prisma.categoria.create({ data: { id: newId(), nombre, color, orden } })).id;
   }
 
-  // Productos: [sku, nombre, categoría, precio, costo, pesable, plu, códigos, favorito]
-  const productos: [string, string, string, number, number, boolean, string | null, string[], boolean][] = [
-    ['FR001', 'Plátano', 'Frutas', 3.5, 2.1, true, '00001', [], true],
-    ['FR002', 'Manzana roja', 'Frutas', 6.9, 4.2, true, '00002', [], true],
-    ['FR003', 'Naranja', 'Frutas', 3.2, 1.8, true, '00003', [], true],
-    ['FR004', 'Palta fuerte', 'Frutas', 9.9, 6.5, true, '00004', [], true],
-    ['VE001', 'Tomate', 'Verduras', 4.5, 2.8, true, '00010', [], true],
-    ['VE002', 'Papa blanca', 'Verduras', 2.8, 1.6, true, '00011', [], true],
-    ['VE003', 'Cebolla roja', 'Verduras', 3.0, 1.7, true, '00012', [], true],
-    ['VE004', 'Lechuga', 'Verduras', 2.5, 1.2, false, null, [], true],
-    ['PA001', 'Pan francés', 'Panadería', 0.3, 0.15, false, null, [], true],
-    ['PA002', 'Pan de molde 600g', 'Panadería', 8.9, 6.2, false, null, ['7751271012345'], false],
-    ['LA001', 'Leche evaporada 400g', 'Lácteos', 4.2, 3.4, false, null, ['7751271001010'], false],
-    ['LA002', 'Yogurt fresa 1L', 'Lácteos', 7.5, 5.6, false, null, ['7751271002024'], false],
-    ['LA003', 'Queso fresco', 'Lácteos', 22.0, 15.0, true, '00020', [], false],
-    ['BE001', 'Agua mineral 625ml', 'Bebidas', 1.8, 0.9, false, null, ['7750182006088'], false],
-    ['BE002', 'Gaseosa cola 1.5L', 'Bebidas', 6.5, 4.6, false, null, ['7750182000017'], false],
-    ['BE003', 'Jugo de naranja 1L', 'Bebidas', 5.9, 4.1, false, null, ['7750182000024'], false],
-    ['AB001', 'Arroz extra 5kg', 'Abarrotes', 24.9, 19.5, false, null, ['7751234500017'], false],
-    ['AB002', 'Azúcar rubia 1kg', 'Abarrotes', 4.3, 3.5, false, null, ['7751234500024'], false],
-    ['AB003', 'Aceite vegetal 1L', 'Abarrotes', 10.9, 8.4, false, null, ['7751234500031'], false],
-    ['AB004', 'Fideos spaghetti 500g', 'Abarrotes', 3.6, 2.5, false, null, ['7751234500048'], false],
-    ['LI001', 'Detergente 900g', 'Limpieza', 12.5, 9.1, false, null, ['7751111000016'], false],
-    ['LI002', 'Papel higiénico x4', 'Limpieza', 6.9, 4.8, false, null, ['7751111000023'], false],
-    ['CA001', 'Pechuga de pollo', 'Carnes', 15.9, 11.2, true, '00030', [], true],
-    ['CA002', 'Carne molida', 'Carnes', 24.0, 17.5, true, '00031', [], false],
+  // Productos con precios de referencia de supermercado en Colombia (COP, IVA incluido; pesables por kg).
+  // Impuesto: IVA19, IVA5, EXENTO (0 %) o EXCLUIDO (0 %). Verifique la clasificación con su contador.
+  // [sku, nombre, categoría, precio, costo, pesable, plu, códigos, favorito, impuesto]
+  type Imp = 'IVA19' | 'IVA5' | 'EXENTO' | 'EXCLUIDO';
+  const TASA: Record<Imp, number> = { IVA19: 19, IVA5: 5, EXENTO: 0, EXCLUIDO: 0 };
+  const productos: [string, string, string, number, number, boolean, string | null, string[], boolean, Imp][] = [
+    ['FR001', 'Banano', 'Frutas', 4200, 2900, true, '00001', [], true, 'EXCLUIDO'],
+    ['FR002', 'Manzana roja', 'Frutas', 9800, 6900, true, '00002', [], true, 'EXCLUIDO'],
+    ['FR003', 'Naranja tangelo', 'Frutas', 3900, 2600, true, '00003', [], true, 'EXCLUIDO'],
+    ['FR004', 'Aguacate Hass', 'Frutas', 9500, 6600, true, '00004', [], true, 'EXCLUIDO'],
+    ['VE001', 'Tomate chonto', 'Verduras', 4800, 3200, true, '00010', [], true, 'EXCLUIDO'],
+    ['VE002', 'Papa pastusa', 'Verduras', 3200, 2100, true, '00011', [], true, 'EXCLUIDO'],
+    ['VE003', 'Cebolla cabezona roja', 'Verduras', 3900, 2600, true, '00012', [], true, 'EXCLUIDO'],
+    ['VE004', 'Lechuga crespa', 'Verduras', 3200, 2000, false, null, [], true, 'EXCLUIDO'],
+    ['PA001', 'Pan francés', 'Panadería', 500, 250, false, null, [], true, 'EXCLUIDO'],
+    ['PA002', 'Pan tajado 600g', 'Panadería', 8900, 6400, false, null, ['7751271012345'], false, 'IVA19'],
+    ['LA001', 'Leche entera bolsa 1,1L', 'Lácteos', 4900, 4000, false, null, ['7751271001010'], false, 'EXENTO'],
+    ['LA002', 'Yogur fresa 1L', 'Lácteos', 9900, 7300, false, null, ['7751271002024'], false, 'IVA19'],
+    ['LA003', 'Queso campesino', 'Lácteos', 22000, 16000, true, '00020', [], false, 'EXENTO'],
+    ['BE001', 'Agua 600ml', 'Bebidas', 2000, 1000, false, null, ['7750182006088'], false, 'IVA19'],
+    ['BE002', 'Gaseosa cola 1,5L', 'Bebidas', 6500, 4700, false, null, ['7750182000017'], false, 'IVA19'],
+    ['BE003', 'Jugo de naranja 1L', 'Bebidas', 6900, 4900, false, null, ['7750182000024'], false, 'IVA19'],
+    ['AB001', 'Arroz blanco 5kg', 'Abarrotes', 22900, 18500, false, null, ['7751234500017'], false, 'EXCLUIDO'],
+    ['AB002', 'Azúcar blanca 1kg', 'Abarrotes', 4500, 3600, false, null, ['7751234500024'], false, 'IVA5'],
+    ['AB003', 'Aceite vegetal 1L', 'Abarrotes', 11900, 9200, false, null, ['7751234500031'], false, 'IVA5'],
+    ['AB004', 'Pasta spaghetti 500g', 'Abarrotes', 3900, 2800, false, null, ['7751234500048'], false, 'IVA5'],
+    ['LI001', 'Detergente en polvo 900g', 'Limpieza', 12900, 9500, false, null, ['7751111000016'], false, 'IVA19'],
+    ['LI002', 'Papel higiénico x4', 'Limpieza', 8900, 6300, false, null, ['7751111000023'], false, 'IVA19'],
+    ['CA001', 'Pechuga de pollo', 'Carnes', 18900, 13500, true, '00030', [], true, 'EXENTO'],
+    ['CA002', 'Carne molida de res', 'Carnes', 26000, 19000, true, '00031', [], false, 'EXENTO'],
   ];
   const idsPorSku: Record<string, string> = {};
-  for (const [sku, nombre, categoria, precio, costo, pesable, plu, codigos, favorito] of productos) {
+  for (const [sku, nombre, categoria, precio, costo, pesable, plu, codigos, favorito, impuesto] of productos) {
     const e = await prisma.producto.findUnique({ where: { sku } });
     if (e) {
       idsPorSku[sku] = e.id;
@@ -150,7 +154,8 @@ async function main() {
         plu,
         precio,
         costo,
-        tasaImpuesto: 18,
+        tasaImpuesto: TASA[impuesto],
+        impuestoCodigo: impuesto,
         stockMinimo: 10,
         favorito,
         codigos: { create: codigos.map((codigo) => ({ id: newId(), codigo })) },
@@ -161,16 +166,16 @@ async function main() {
   // Promociones de ejemplo
   if (!(await prisma.promocion.count())) {
     await prisma.promocion.create({
-      data: { id: newId(), nombre: 'Agua 2x1', tipo: 'NXM', productoIds: [idsPorSku['BE001']], llevar: 2, pagar: 1 },
+      data: { id: newId(), nombre: 'Agua 600ml 2x1', tipo: 'NXM', productoIds: [idsPorSku['BE001']], llevar: 2, pagar: 1 },
     });
     await prisma.promocion.create({
       data: {
         id: newId(),
-        nombre: 'Pan francés: 10 o más a S/0.25',
+        nombre: 'Pan francés: 10 o más a $400',
         tipo: 'PRECIO_CANTIDAD',
         productoIds: [idsPorSku['PA001']],
         cantidadMinima: 10,
-        precioPromo: 0.25,
+        precioPromo: 400,
       },
     });
   }

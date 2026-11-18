@@ -117,7 +117,7 @@ function unaCopia(t: TicketData, opts: { ancho: 58 | 80; moneda: string; abrirCa
   p.linea(limpiar(t.sucursal));
   if (t.direccion) envolver(limpiar(t.direccion), cols).forEach((l) => p.linea(l));
   if (t.telefono) p.linea(`Tel: ${t.telefono}`);
-  if (t.ruc) p.linea(`${t.etiquetaFiscal ?? 'RUC'}: ${t.ruc}`);
+  if (t.ruc) p.linea(`${t.etiquetaFiscal ?? 'NIT'}: ${t.ruc}`);
   for (const l of t.encabezado ?? []) envolver(limpiar(l), cols).forEach((x) => p.linea(x));
   p.alinear('izq').separador();
   if (t.anulada) p.alinear('centro').negrita(true).linea('*** ANULADO ***').negrita(false).alinear('izq');
@@ -140,7 +140,7 @@ function unaCopia(t: TicketData, opts: { ancho: 58 | 80; moneda: string; abrirCa
   if (Number(t.descuento) > 0 && t.mostrarAhorro !== false) p.dosColumnas('Usted ahorro', fmt(t.descuento, opts.moneda));
   p.negrita(true).grande(true).dosColumnas('TOTAL', fmt(t.total, opts.moneda), Math.floor(cols / 2)).grande(false).negrita(false);
   for (const pg of t.pagos) p.dosColumnas(pg.metodo, fmt(pg.monto, opts.moneda));
-  if (Number(t.vuelto) > 0) p.negrita(true).dosColumnas('Vuelto', fmt(t.vuelto, opts.moneda)).negrita(false);
+  if (Number(t.vuelto) > 0) p.negrita(true).dosColumnas('Cambio',fmt(t.vuelto, opts.moneda)).negrita(false);
   p.separador();
   p.alinear('centro');
   if (t.pie) envolver(limpiar(t.pie), cols).forEach((l) => p.linea(l));

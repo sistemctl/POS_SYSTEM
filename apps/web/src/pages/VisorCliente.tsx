@@ -21,7 +21,7 @@ export default function VisorCliente() {
   useEffect(() => {
     window.visor?.onUpdate(setE);
   }, []);
-  const m = e?.moneda ?? 'S/';
+  const m = e?.moneda ?? '$';
   return (
     <div className="flex h-full flex-col bg-slate-900 p-8 text-white">
       <div className="mb-4 text-3xl font-bold text-marca-500">¡Bienvenido!</div>
@@ -38,7 +38,7 @@ export default function VisorCliente() {
       {e && Number(e.ahorro) > 0 && <div className="text-right text-2xl text-marca-500">Usted ahorra {dinero(e.ahorro, m)}</div>}
       {e?.vuelto && !e.lineas.length ? (
         <div className="text-right">
-          <div className="text-3xl">Su vuelto</div>
+          <div className="text-3xl">Su cambio</div>
           <div className="text-8xl font-extrabold text-marca-500">{dinero(e.vuelto, m)}</div>
         </div>
       ) : (

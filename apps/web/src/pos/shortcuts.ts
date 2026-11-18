@@ -2,7 +2,9 @@
 export const ATAJOS = {
   buscar: 'F1',
   cantidad: 'F2',
+  ayuda: 'F3',
   pesar: 'F4',
+  masOpciones: 'F5',
   suspender: 'F6',
   recuperar: 'F7',
   descuento: 'F8',

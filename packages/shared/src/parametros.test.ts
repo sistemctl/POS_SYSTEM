@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { calcularPago, calcularVenta, mismoMonto } from './pricing';
-import { aplicarPreset, formatearDinero, normalizarParametros, PARAMETROS_DEFECTO, parsearNumeroLocal, PRESETS_PAIS } from './parametros';
+import { aplicarPreset, denominacionesMoneda, formatearDinero, normalizarParametros, PARAMETROS_DEFECTO, parsearNumeroLocal, PRESETS_PAIS } from './parametros';
+
+describe('denominaciones para el arqueo', () => {
+  it('usa billetes y monedas colombianos (sin centavos)', () => {
+    const d = denominacionesMoneda('COP');
+    expect(d.billetes).toContain(100000);
+    expect(d.monedas).toContain(50);
+    expect([...d.billetes, ...d.monedas].every((v) => Number.isInteger(v))).toBe(true);
+  });
+  it('moneda desconocida cae en pesos colombianos', () => {
+    expect(denominacionesMoneda('XXX')).toEqual(denominacionesMoneda('COP'));
+  });
+});
 
 const CO = PRESETS_PAIS.CO;
 const PE = PRESETS_PAIS.PE;

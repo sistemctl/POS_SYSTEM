@@ -332,7 +332,7 @@ export function Sucursales() {
               ['codigo', 'Código'],
               ['nombre', 'Nombre'],
               ['direccion', 'Dirección'],
-              ['ruc', 'RUC / NIT'],
+              ['ruc', 'NIT (con dígito de verificación)'],
               ['telefono', 'Teléfono'],
             ].map(([k, t]) => (
               <Campo key={k} etiqueta={t}>

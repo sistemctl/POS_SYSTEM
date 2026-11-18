@@ -21,7 +21,7 @@ const defecto: ConfigEquipo = {
   cajaId: null,
   cajaNombre: null,
   sucursalId: null,
-  moneda: 'S/',
+  moneda: '$',
   inactividadMin: 10,
 };
 
